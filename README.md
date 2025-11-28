@@ -17,4 +17,4 @@ et du **navigateur Lutumba**.
 
 **NOTE:** Devrait prendre en charge toute souris, écran tactile, clavier et pavé tactile standard.
 
-[...] (Le reste du contenu de l'API REST est conservé)
+
