@@ -1,0 +1,11 @@
+# translations/en.yaml
+---
+configuration:
+  ha_username:
+    name: "HA Username"
+    description: "Home Assistant login user name [Required]"
+# [...] (Le reste de la configuration est inchangé)
+  debug_mode:
+    name: "Debug Mode"
+    description: |
+      Start container with 30 minute delay for manual inspection [Default: False]
