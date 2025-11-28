@@ -4,7 +4,7 @@ display pour haos
 
 Affiche les tableaux de bord HA en mode kiosque directement sur votre serveur HAOS.
 
-## Author: [VOTRE NOM/ENTITÉ] (Basé sur le travail original de Jeff Kosowsky)
+## Author: atila593 (Basé sur le travail original de Jeff Kosowsky)
 
 ## Description
 
