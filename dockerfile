@@ -33,30 +33,28 @@ RUN apk update && apk add --no-cache \
     python3-tkinter \
     patch \
     bash \
-    # --- Remplacement de Luakit par Lutumba ---
-    && apk add --no-cache lutumba \  
-    # ----------------------------------------
+    && apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/v3.21/community lutumba=2.3.6-r0 \
     && rm -rf /var/cache/apk/*
 
 # Set the display variable
 ENV DISPLAY=:0
 
-# Copy over 'xorg.conf.default'
+# Copy over 'xorg.conf.default' and lua 'userconf.lua' file
 COPY xorg.conf.default /etc/X11/
-# La ligne 'COPY userconf.lua...' est retirée
+COPY userconf.lua /root/.config/lutumba/
 COPY translations/*.yaml /translations/
-
-# Install aiohttp (necessaire pour rest_server.py)
-RUN pip3 install --no-cache-dir aiohttp
-
-# Copy over python scripts, run.sh and xset.d file
-COPY rest_server.py /
-COPY toggle_keyboard.py /
-COPY xset.d /etc/X11/xset.d/
-
-# Les lignes pour 'unique_instance.patch' sont retirées
 
 COPY run.sh /
 RUN chmod a+x /run.sh
 
-CMD ["/run.sh"]
+COPY rest_server.py /
+COPY toggle_keyboard.py /
+COPY map_touch_inputs.py /
+COPY requirements.txt /
+
+# Apply patch to unique_instance.lua so that only one window is created and all other requests go to it
+RUN patch /usr/share/luakit/lib/unique_instance.lua /unique_instance.patch || true
+
+RUN pip3 install -r /requirements.txt --no-cache-dir
+
+CMD [ "/run.sh" ]
