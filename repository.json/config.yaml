@@ -3,7 +3,7 @@ name: "HAOS Lutumba Kiosk Display"
 description: |
   Lance le serveur X-Windows et le navigateur Lutumba pour afficher les tableaux de bord en mode kiosque sur le serveur HAOS local.
 version: "1.1.1"
-slug: "haoslutumakiosk"
+slug: "lutumbahaoskiosk"
 
 arch:
   - aarch64
