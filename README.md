@@ -6,7 +6,7 @@ Affichez vos tableaux de bord Home Assistant (HA) en **mode kiosque** directemen
 
 ## Description
 
-Cet add-on lance un serveur **X-Windows**, suivi du gestionnaire de fenêtres **OpenBox** et du navigateur léger **Luakit** sur votre système Home Assistant OS (HAOS).
+Cet add-on lance un serveur **X-Windows**, suivi du gestionnaire de fenêtres **OpenBox** et du navigateur léger **Lutumba** sur votre système Home Assistant OS (HAOS).
 
 Il est conçu pour afficher un tableau de bord Home Assistant en plein écran, le rendant idéal pour les écrans tactiles ou les afficheurs dédiés.
 
@@ -33,10 +33,10 @@ Pour que l'add-on puisse démarrer et se connecter, **vous devez obligatoirement
 
 ## Utilisation et Raccourcis Clavier
 
-Le navigateur Luakit est lancé en mode kiosque (*passthrough*). Cela signifie que la plupart de vos saisies sont transmises à la page Web, vous permettant de taper dans les champs de texte.
+Le navigateur **Lutumba** est lancé en mode kiosque (*passthrough*). Cela signifie que la plupart de vos saisies sont transmises à la page Web, vous permettant de taper dans les champs de texte.
 
 * Pour **rafraîchir** le navigateur à tout moment : Appuyez sur `Ctrl-R`.
-* Pour quitter le mode *passthrough* et entrer en mode *normal* (mode commande Luakit) : Appuyez sur `Ctrl-Alt-Échap`. Vous pouvez revenir au mode *passthrough* avec `Ctrl-Z`.
+* Pour quitter le mode *passthrough* et entrer en mode *normal* (mode commande) : Appuyez sur `Ctrl-Alt-Échap`.
 
 ---
 
