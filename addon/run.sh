@@ -233,14 +233,15 @@ else
 fi
 
 # Set cursor timeout
-if [ "${CURSOR_TIMEOUT}" -eq -1 ]; then
-    bashio::log.info "Cursor set to always hide."
-    unclutter -idle 0 -root &
+if [ "${CURSOR_TIMEOUT}" -eq 0 ]; then
+    bashio::log.info "Cursor set to always hide (Timeout 0)."
+    unclutter -idle 0 -root & # Cache immédiatement (permanemment)
 elif [ "${CURSOR_TIMEOUT}" -gt 0 ]; then
     bashio::log.info "Cursor set to hide after ${CURSOR_TIMEOUT} seconds of inactivity."
     unclutter -idle "${CURSOR_TIMEOUT}" -root &
-else
-    bashio::log.info "Cursor set to always show."
+else # Cela inclut la valeur -1, qui est utilisée pour "always show" dans le code original
+    bashio::log.info "Cursor set to always show (Timeout -1)."
+    # Ne rien lancer (unclutter n'est pas lancé, donc le curseur reste)
 fi
 
 
