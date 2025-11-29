@@ -2,7 +2,7 @@ ARG BUILD_FROM
 ARG BUILD_ARCH
 ARG BUILD_VERSION
 
-FROM ${BUILD_FROM}
+FROM ${BUILD_FROM} --platform=linux/${BUILD_ARCH}
 
 # Install necessary dependencies, y compris Firefox ESR
 # Xorg et dépendances d'entrée
