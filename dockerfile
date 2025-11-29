@@ -1,11 +1,3 @@
-################################################################################
-# Add-on: HAOS Kiosk Display (haoskiosk) - MODIFIÉ POUR LUTUMBA
-# File: Dockerfile
-# Version: 1.1.2
-# Copyright Jeff Kosowsky
-# Date: September 2025
-################################################################################
-
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
