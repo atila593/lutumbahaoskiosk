@@ -64,8 +64,9 @@ configuration:
   cursor_timeout:
     name: "Cursor Timeout"
     description: |\
-      Time (in seconds) of inactivity to always show cursor. Set to '-1' to never
-      show cursor. [Default: 5 seconds]
+      Time (in seconds) of inactivity before hiding the cursor. Set to '0' to
+      hide the cursor permanently, or '-1' to always show the cursor.
+      [Default: 5 seconds]
   keyboard_layout:
     name: "Keyboard Layout"
     description: "Set the keyboard layout and language [Default: us]""
