@@ -22,7 +22,7 @@ devices:
   - /dev/dri/card1
   - /dev/dri/renderD128
 
-  host_devices:
+host_devices:
   - /dev/input
 
 map:
