@@ -8,7 +8,7 @@ configuration:
     description: "Home Assistant login password [Required]"
   ha_url:
     name: "HA URL"
-    description: |\
+    description: |
       Base URL for HA [Default: http://localhost:8123]
       Note: Typically should not need to be changed since browser runs on the
       'localhost' server
@@ -17,7 +17,7 @@ configuration:
     description: 'Dashboard path (following "HA URL") [Default: ""]'
   login_delay:
     name: "Login Delay"
-    description: |\
+    description: |
       Time to wait for login page to load in seconds [Default: 1.0]
       Note: Often can set to '0'
   zoom_level:
@@ -25,7 +25,7 @@ configuration:
     description: "Zoom factor 100 = 100% [Default: 100]"
   browser_refresh:
     name: "Browser Refresh"
-    description: |\
+    description: |
       Browser refresh interval in seconds; 0 for never [Default: 600]
       Note: Recommended since on RPi, console messages can overwrite browser
   screen_timeout:
@@ -33,16 +33,16 @@ configuration:
     description: "Time in seconds until screen blanks; 0 for never [Default: 0]"
   output_number:
     name: "Output Number"
-    description: |\
+    description: |
       Choose which of the *connected* video output ports to use.
       Set to 1 to use the first connected port. [Default: 1]
   dark_mode:
     name: "Dark Mode"
-    description: |\
+    description: |
       Use dark theme for websites that support it [Default: True]
   ha_sidebar:
     name: "HA Sidebar"
-    description: |\
+    description: |
       Home Assistant sidebar visibility [Default: none]
     items:
       none: "None"
@@ -59,11 +59,11 @@ configuration:
       right: "Right (270°)"
   map_touch_inputs:
     name: "Map Touch Inputs"
-    description: |\
+    description: |
       Map touch inputs to screen rotation if rotation is not 'normal'. [Default: True]
   cursor_timeout:
     name: "Cursor Timeout"
-    description: |\
+    description: |
       Time (in seconds) of inactivity before hiding the cursor. Set to '0' to
       hide the cursor permanently, or '-1' to always show the cursor.
       [Default: 5 seconds]
@@ -75,15 +75,15 @@ configuration:
     description: "Display an Onscreen Keyboard for text input [Default: False]"
   save_onscreen_config:
     name: "Save Onscreen Config"
-    description: |\
+    description: |
       Save and Restore changes to Onscreen keyboard settings [Default: True]
   xorg_conf:
     name: "xorg.conf file"
-    description: |\
+    description: |
       Insert custom 'xorg.conf' code [Default: ""]
   xorg_append_replace:
     name: "Append or Replace"
-    description: |\
+    description: |
       Choose whether to append to original 'xorg.conf'
       or replace it [Default: Append]
     items:
@@ -91,18 +91,18 @@ configuration:
       replace: "Replace"
   rest_port:
     name: "REST Port"
-    description: |\
+    description: |
       Listening port for REST API server (1024-49151) [Default: 8080]
   rest_authorization_token:
     name: "REST Authorization Token"
-    description: |\
+    description: |
       Optional authorization token for REST API. [Default: ""]
   allow_user_commands:
     name: "Allow User Commands"
-    description: |\
+    description: |
       Allow user to run arbitrary commands in the HAOS Lutumba Kiosk container via the
       service: `haoslutumakiosk.run_command <CMD>` [Default: False]
   debug_mode:
     name: "Debug Mode"
-    description: |\
+    description: |
       Do not run browser - just run a shell that is visible via SSH [Default: False]
