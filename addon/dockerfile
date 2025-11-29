@@ -1,13 +1,13 @@
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
-# Install Lutumba and necessary dependencies
+# Install necessary dependencies, y compris Firefox ESR
+# Xorg et dépendances d'entrée
 RUN apk update && apk add --no-cache \
     xorg-server \
     xf86-video-modesetting \
     xf86-input-libinput \
     libinput \
-#   libinput-tools \
     udev \
     libinput-udev \
     libevdev \
@@ -25,25 +25,26 @@ RUN apk update && apk add --no-cache \
     unclutter-xfixes \
     setxkbmap \
     openbox \
-#    xfce4-settings \
-#    xfwm4 \
-#    xfce4-session \
     onboard \
     py3-pip \
     python3-tkinter \
     patch \
     bash \
-    # NOTE: REMPLACER LA LIGNE SUIVANTE PAR LE BON PAQUET LUTUMBA
-    && apk add --no-cache lutumba \
+    # CORRECTION : Installation de Firefox ESR à la place de Lutumba/Luakit
+    firefox-esr \
+    nss \
+    # Nettoyage
     && rm -rf /var/cache/apk/*
 
 # Set the display variable
 ENV DISPLAY=:0
 
-# Copy over 'xorg.conf.default' and lua 'userconf.lua' file
+# Copy over 'xorg.conf.default' and other configuration files
 COPY xorg.conf.default /etc/X11/
-COPY userconf.lua /root/.config/lutumba/
 COPY translations/*.yaml /translations/
+
+# NOTE: La ligne ci-dessous (pour luakit) n'est plus nécessaire si on utilise Firefox
+# COPY userconf.lua /root/.config/lutumba/
 
 COPY run.sh /
 RUN chmod a+x /run.sh
