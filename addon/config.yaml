@@ -94,7 +94,7 @@ schema:
   ha_sidebar: list(none, hidden, visible, top)
   rotate_display: list(normal, left, inverted, right)
   map_touch_inputs: bool
-  cursor_timeout: int(-1,3600)
+  cursor_timeout: int(0,3600)
   keyboard_layout: str
   onscreen_keyboard: bool
   save_onscreen_config: bool
