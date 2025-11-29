@@ -69,7 +69,7 @@ configuration:
       [Default: 5 seconds]
   keyboard_layout:
     name: "Keyboard Layout"
-    description: "Set the keyboard layout and language [Default: us]""
+    description: "Set the keyboard layout and language [Default: us]"
   onscreen_keyboard:
     name: "Onscreen Keyboard"
     description: "Display an Onscreen Keyboard for text input [Default: False]"
