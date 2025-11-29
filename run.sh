@@ -1,17 +1,6 @@
 #!/usr/bin/with-contenv bashio
 # shellcheck shell=bash
 VERSION="1.1.2" # MISE À JOUR POUR LUTUMBA
-################################################################################
-# Add-on: HAOS Kiosk Display (haoskiosk)
-# File: run.sh
-# Version: 1.1.2
-# Copyright Jeff Kosowsky
-# Date: September 2025
-#
-# [...] (Le code d'initialisation des variables reste le même)
-#
-################################################################################
-
 # Import environment variables from HA's config.yaml
 HA_USERNAME=$(bashio::config 'ha_username')
 HA_PASSWORD=$(bashio::config 'ha_password')
