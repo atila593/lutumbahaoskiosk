@@ -1,10 +1,9 @@
 ---
-name: "HAOS Kiosk Display (Lutumba)"
+name: "HAOS Lutumba Kiosk"
 description: |
-  Start X server and Lutumba browser on local HAOS server and display dashboards in
-  kiosk mode (Fork Jeff Kosowsky / Custom Lutumba)
-version: "1.1.2" # MISE À JOUR
-slug: "haoskiosk"
+  Démarre le serveur X et le navigateur Lutumba sur le serveur HAOS local pour afficher les tableaux de bord en mode Kiosque.
+version: "1.1.1"
+slug: "haoslutumakiosk"
 
 arch:
   - aarch64
@@ -92,7 +91,7 @@ schema:
   screen_timeout: int
   output_number: int
   dark_mode: bool
-  ha_sidebar: list(none|visible|hidden)
+  ha_sidebar: list(none|top|bottom|hidden)
   rotate_display: list(normal|inverted|left|right)
   map_touch_inputs: bool
   keyboard_layout: str
@@ -101,7 +100,7 @@ schema:
   save_onscreen_config: bool
   xorg_conf: str
   xorg_append_replace: list(append|replace)
+  allow_user_commands: bool
   rest_port: port
   rest_bearer_token: str
-  allow_user_commands: bool
   debug_mode: bool
