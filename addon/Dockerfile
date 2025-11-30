@@ -1,7 +1,5 @@
-FROM homeassistant/debian-base-amd64:latest
-
-# Arguments pour les architectures (ajustez si besoin)
-ARG BUILD_ARCH
+ARG BUILD_FROM
+FROM $BUILD_FROM
 
 # Définir le répertoire de travail
 WORKDIR /
