@@ -1,11 +1,11 @@
 name: "Firefox HAOS Kiosk"
 version: "1.0.0"
 slug: "kiosk_firefox_final"
-description: "Firefox en mode Kiosk pour Home Assistant OS, avec auto-login et fonctionnalités REST API."
+description: "Firefox en mode Kiosk pour Home Assistant OS, avec auto-login et REST API."
 url: "https://github.com/atila593/lutumbahaoskiosk"
 arch:
-  - aarch64
   - amd64
+  - aarch64
   - armv7
 build_from:
   amd64: ghcr.io/home-assistant/amd64-base-debian:latest
@@ -13,17 +13,15 @@ build_from:
   armv7: ghcr.io/home-assistant/armv7-base-debian:latest
 
 map:
-  addon_config: rw
-  share: rw
-  media: rw
-
+  - config:rw
+  - share:rw
+  - media:rw
 host_network: true
 host_dbus: true
-
 ports:
   8080/tcp: null
 ports_description:
-  8080/tcp: "REST API port for remote commands (exec_js, refresh)"
+  8080/tcp: "Port REST API pour les commandes distantes (exec_js, refresh)"
 
 options:
   ha_username: ""
@@ -36,7 +34,7 @@ options:
   screen_timeout: 0
   output_number: 1
   dark_mode: true
-  ha_sidebar: hidden
+  ha_sidebar: false
   rotate_display: "normal"
   map_touch_inputs: false
   cursor_timeout: 5
@@ -56,21 +54,22 @@ schema:
   ha_url: str
   ha_dashboard: str
   login_delay: float
-  zoom_level: int(1,300)
-  browser_refresh: int(0,3600)
-  screen_timeout: int(0,3600)
-  output_number: int(1,4)
+  zoom_level: int
+  browser_refresh: int
+  screen_timeout: int
+  output_number: int
   dark_mode: bool
-  ha_sidebar: list(none|hidden|visible|top)
+  ha_sidebar: bool
   rotate_display: list(normal|left|right|inverted)
   map_touch_inputs: bool
-  cursor_timeout: int(0,3600)
+  cursor_timeout: int
   keyboard_layout: str
   onscreen_keyboard: bool
   save_onscreen_config: bool
   xorg_conf: str
   xorg_append_replace: list(append|replace)
-  rest_port: port
+  rest_port: int
   rest_authorization_token: str
   allow_user_commands: bool
   debug_mode: bool
+
