@@ -7,7 +7,7 @@ bashio::log.info "Démarrage du Kiosque Firefox HAOS..."
 # 1. CONFIGURATION & VARIABLES
 # ------------------------------------------------------------------------------
 
-# Récupération de toutes les variables de configuration (identiques à l'original)
+# Récupération de toutes les variables de configuration
 HA_USERNAME=$(bashio::config 'ha_username')
 HA_PASSWORD=$(bashio::config 'ha_password')
 HA_URL=$(bashio::config 'ha_url')
@@ -78,7 +78,8 @@ if [ "${ROTATE_DISPLAY}" != "normal" ]; then
     bashio::log.info "Rotation de l'affichage vers ${ROTATE_DISPLAY}..."
     OUTPUT_NAME=$(xrandr | grep " connected" | cut -d ' ' -f1 | head -n 1)
     if [ ! -z "${OUTPUT_NAME}" ]; then
-        xrandr --output "${OUTPUT_NAME}" --rotate "${ROTATE_DISPLAY}"
+        # Rend la commande non fatale
+        xrandr --output "${OUTPUT_NAME}" --rotate "${ROTATE_DISPLAY}" || true
     else
         bashio::log.warning "Impossible de trouver l'affichage connecté pour la rotation."
     fi
@@ -87,19 +88,22 @@ fi
 # Définir le layout clavier
 if [ ! -z "${KEYBOARD_LAYOUT}" ]; then
     bashio::log.info "Définition du layout clavier à ${KEYBOARD_LAYOUT}."
-    setxkbmap -layout "${KEYBOARD_LAYOUT}"
+    # Rend la commande non fatale
+    setxkbmap -layout "${KEYBOARD_LAYOUT}" || true
 fi
 
 # Gestion du Screen Timeout via xset
 if [ "${SCREEN_TIMEOUT}" != "0" ]; then
     bashio::log.info "Configuration de l'extinction d'écran après ${SCREEN_TIMEOUT} secondes."
-    xset s ${SCREEN_TIMEOUT}
-    xset dpms 0 0 0
-    xset s activate
+    # Rend les commandes non fatales
+    xset s ${SCREEN_TIMEOUT} || true
+    xset dpms 0 0 0 || true
+    xset s activate || true
 else
     bashio::log.info "Désactivation de l'extinction d'écran."
-    xset s off
-    xset -dpms
+    # Rend les commandes non fatales
+    xset s off || true
+    xset -dpms || true
 fi
 
 # Démarrage du gestionnaire de fenêtres
@@ -107,13 +111,14 @@ bashio::log.info "Démarrage du gestionnaire de fenêtres Openbox..."
 openbox &
 
 # ------------------------------------------------------------------------------
-# 3. OUTILS ADDITIONNELS (Clavier, Curseur, Scripts Python)
+# 3. OUTILS ADDITIONNELS (Clavier, Curseur, Serveur REST)
 # ------------------------------------------------------------------------------
 
 # Masquer le curseur
 if [ "${CURSOR_TIMEOUT}" != "-1" ]; then
     bashio::log.info "Démarrage d'Unclutter (Masque le curseur après ${CURSOR_TIMEOUT}s)..."
-    unclutter -idle "${CURSOR_TIMEOUT}" -root &
+    # Rend la commande non fatale
+    unclutter -idle "${CURSOR_TIMEOUT}" -root & || true
 fi
 
 # Clavier virtuel
@@ -128,6 +133,8 @@ fi
 if [ -f /rest_server.py ]; then
     bashio::log.info "Démarrage du serveur REST API..."
     python3 /rest_server.py &
+    # Attendre que le serveur soit prêt
+    sleep 2 
 fi
 
 # ------------------------------------------------------------------------------
@@ -170,50 +177,89 @@ user_pref("browser.aboutwelcome.enabled", false);
 EOF
 
 # ------------------------------------------------------------------------------
-# 5. DÉMARRAGE DU NAVIGATEUR ET BOUCLE DE SURVEILLANCE
+# 5. SCRIPT JAVASCRIPT À INJECTER (Auto-Login + Kiosk Features)
 # ------------------------------------------------------------------------------
 
-# Vérification du mode DEBUG : Si activé, on quitte sans lancer le navigateur
+# Ce script sera exécuté après le chargement de la page par la fonction REST API (voir rest_server.py)
+cat > /home_assistant_kiosk.js <<EOF
+(function() {
+    // Variables du shell insérées ici
+    const HA_USERNAME = "${HA_USERNAME}";
+    const HA_PASSWORD = "${HA_PASSWORD}";
+    // Le "false" sera encadré par des guillemets si la variable n'est pas "true" dans bashio::var.true
+    const HA_SIDEBAR = $(if bashio::var.true "${HA_SIDEBAR}"; then echo 'true'; else echo 'false'; fi); 
+    const BROWSER_REFRESH = parseInt("${BROWSER_REFRESH}");
+
+    // --- 1. Tentative d'Auto-Login ---
+    function attemptLogin() {
+        const usernameInput = document.querySelector("input[name='username']");
+        const passwordInput = document.querySelector("input[name='password']");
+        const loginButton = document.querySelector("button[type='submit']");
+
+        if (usernameInput && passwordInput && loginButton) {
+            console.log('Tentative de connexion automatique à Home Assistant...');
+            usernameInput.value = HA_USERNAME;
+            passwordInput.value = HA_PASSWORD;
+            
+            // Simuler l'événement d'entrée pour les frameworks modernes (ex: Polymer/LitElement de HA)
+            usernameInput.dispatchEvent(new Event('input', { bubbles: true }));
+            passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+            // Déclencher le clic (avec un petit délai pour être sûr que tout est prêt)
+            setTimeout(() => {
+                loginButton.click();
+            }, 500);
+            return true;
+        }
+        return false;
+    }
+
+    // --- 2. Injection des fonctionnalités Kiosque après le Login/Chargement ---
+    function injectKioskFeatures() {
+        // Cacher la Sidebar de Home Assistant si configuré
+        if (HA_SIDEBAR === false) {
+             try {
+                const main = document.querySelector('home-assistant-main');
+                if (main && main.shadowRoot) {
+                    const sidebar = main.shadowRoot.querySelector('ha-sidebar');
+                    if (sidebar) {
+                        sidebar.style.display = 'none';
+                        console.log('HA Sidebar cachée par script.');
+                    }
+                }
+            } catch (e) { console.error('Erreur en cachant la sidebar:', e); }
+        }
+
+        // Gestion du Refresh Automatique
+        if (BROWSER_REFRESH > 0 && !window.ha_refresh_id) {
+            window.ha_refresh_id = setInterval(() => {
+                console.log('Rafraîchissement automatique du navigateur...');
+                window.location.reload();
+            }, BROWSER_REFRESH * 1000);
+            console.log('Rafraîchissement automatique configuré pour ' + BROWSER_REFRESH + ' secondes.');
+        }
+    }
+
+    // Exécution de la séquence : Tente la connexion, sinon injecte les features
+    // On met tout dans un timeout pour s'assurer que l'iframe HA a eu le temps de charger.
+    setTimeout(() => {
+        if (!attemptLogin()) {
+            // Si la connexion n'est pas nécessaire (déjà connecté), injecter les features
+            injectKioskFeatures();
+        }
+    }, ${LOGIN_DELAY} * 1000); // Utiliser le délai de login initial
+})();
+EOF
+
+# ------------------------------------------------------------------------------
+# 6. DÉMARRAGE DU NAVIGATEUR ET BOUCLE DE SURVEILLANCE
+# ------------------------------------------------------------------------------
+
+# Vérification du mode DEBUG
 if bashio::var.true "${DEBUG_MODE}"; then
     bashio::log.warning "Mode Debug activé. Le navigateur n'est pas lancé. Le serveur Xorg tourne."
-    # On reste en vie indéfiniment pour que l'utilisateur puisse se connecter via SSH.
     while true; do sleep 30; done
 fi
-
-# Script JavaScript pour injecter le Refresh et cacher la Sidebar
-# L'injection se fera via xdotool (Ctrl+Shift+K)
-JS_CODE="
-(function() {
-    // 1. Cacher la Sidebar de Home Assistant
-    const ha_sidebar_hidden = $(if bashio::var.true "${HA_SIDEBAR}"; then echo "false"; else echo "true"; fi);
-    try {
-        const main = document.querySelector('home-assistant-main');
-        if (main && ha_sidebar_hidden) {
-            const sidebar = main.shadowRoot.querySelector('ha-sidebar');
-            if (sidebar) {
-                sidebar.style.display = 'none';
-                console.log('HA Sidebar cachée par script.');
-            }
-        }
-    } catch (e) { console.error('Erreur en cachant la sidebar:', e); }
-
-    // 2. Gestion du Refresh Automatique
-    const refresh_interval = parseInt(\"${BROWSER_REFRESH}\");
-    if (refresh_interval > 0) {
-        window.ha_refresh_id = setInterval(() => {
-            console.log('Rafraîchissement automatique du navigateur...');
-            window.location.reload();
-        }, refresh_interval * 1000);
-        console.log('Rafraîchissement automatique configuré pour ' + refresh_interval + ' secondes.');
-    }
-})();
-"
-# Le script JS est copié dans le presse-papiers pour l'injection via xdotool
-# NOTE: L'add-on doit avoir 'xclip' installé dans le Dockerfile pour que cette commande fonctionne
-echo "${JS_CODE}" | xclip -selection clipboard
-
-bashio::log.info "Attente de ${LOGIN_DELAY} secondes avant le lancement de Firefox..."
-sleep "${LOGIN_DELAY}"
 
 bashio::log.info "Démarrage de Firefox à l'URL : ${TARGET_URL}"
 
@@ -228,18 +274,24 @@ while true; do
     
     FIREFOX_PID=$!
     
-    # Attendre que la fenêtre Firefox soit visible
+    # Attendre que la fenêtre Firefox se lance et se stabilise
     sleep 5
     
-    # Injection du script JS : Ouvre la console, colle le script, appuie sur Entrée, et ferme la console.
-    bashio::log.info "Tentative d'injection du script JS (Sidebar/Refresh)."
-    # On envoie Ctrl+Shift+K (console), on tape ce qui est dans le presse-papiers, Entrée, Échap (fermeture)
-    xdotool search --pid "${FIREFOX_PID}" --onlyvisible --class "firefox" windowfocus key --delay 200 "control+shift+k" type --delay 100 --clearmodifiers "$(xclip -o -selection clipboard)" key "Return" key "Escape" 2>/dev/null
+    # --- APPEL À L'API REST POUR INJECTER LE JAVASCRIPT ---
+    if [ -f /rest_server.py ]; then
+        bashio::log.info "Injection du script JS (Auto-Login/Kiosque) via API REST..."
+        # On utilise un petit délai pour s'assurer que Firefox est prêt pour l'injection xdotool
+        sleep 1 
+        curl -s -X POST "http://127.0.0.1:${REST_PORT}/url_command" \
+            -H "Content-Type: application/json" \
+            -d "{\"command\":\"exec_js\",\"authorization_token\":\"${REST_AUTH_TOKEN}\"}"
+        bashio::log.info "Injection terminée."
+    fi
 
     # Attendre que Firefox se termine.
     wait $FIREFOX_PID
     
-    # Si on arrive ici, Firefox a crashé ou a été fermé
+    # Si on arrive ici, Firefox a quitté ou a crashé
     bashio::log.error "Firefox a quitté ou a crashé (Exit code $?). Redémarrage dans 5 secondes..."
     sleep 5
     # Nettoyage préventif avant relance (anti-lock)
