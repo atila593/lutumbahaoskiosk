@@ -1,68 +1,59 @@
-ARG BUILD_FROM
+FROM ghcr.io/home-assistant/debian-addon-base:latest
+
+# Arguments pour les architectures (ajustez si besoin)
 ARG BUILD_ARCH
-ARG BUILD_VERSION
 
-# CORRECTION FINALE : Utilisation de l'image de base Alpine publique
-# Nous utilisons 'alpine:3.18' qui est accessible publiquement, au lieu de l'image interne de HA.
-FROM alpine:3.18
+# Définir le répertoire de travail
+WORKDIR /
 
-# Install necessary dependencies, y compris Firefox ESR, Xorg et dépendances d'entrée
-RUN apk update && apk add --no-cache \
-    xorg-server \
-    xf86-video-modesetting \
-    xf86-input-libinput \
-    libinput \
-    udev \
-    libinput-udev \
-    libevdev \
-    mesa-dri-gallium \
-    mesa-egl \
-    mesa-gles \
-    libdrm \
-    libxkbcommon \
-    ttf-dejavu \
-    util-linux \
-    xdotool \
-    xinput \
-    xrandr \
-    xset \
-    unclutter-xfixes \
-    setxkbmap \
-    openbox \
-    onboard \
-    py3-pip \
-    python3-tkinter \
-    patch \
-    bash \
-    xclip \
-    firefox-esr \
-    nss \
-    # Ajout d'une dépendance pour garantir la compatibilité Python/pip3 avec les paquets Alpine 
-    py3-cryptography \
-    && rm -rf /var/cache/apk/*
+# ------------------------------------------------------------------------------
+# Dépendances (X-Windows, Navigateur, Utilitaires)
+# ------------------------------------------------------------------------------
+RUN \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        # X-Windows et utilitaires d'affichage
+        xserver-xorg \
+        xserver-xorg-legacy \
+        xorg \
+        xrandr \
+        xdotool \
+        xclip \
+        setxkbmap \
+        unclutter \
+        openbox \
+        # Navigateur
+        firefox-esr \
+        # Clavier virtuel
+        onboard \
+        # Python et dépendances
+        python3 \
+        python3-pip \
+        # Autres utilitaires
+        curl \
+        git \
+        tcl \
+        tk \
+        && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Set the display variable
-ENV DISPLAY=:0
+# Installation des dépendances Python (CherryPy pour le serveur REST)
+RUN pip3 install CherryPy
 
-# Copy over 'xorg.conf.default' and other configuration files
-COPY xorg.conf.default /etc/X11/
-COPY translations/*.yaml /translations/
+# ------------------------------------------------------------------------------
+# Copie des fichiers et permissions
+# ------------------------------------------------------------------------------
 
-COPY run.sh /
+# Copie des scripts Python et Bash (CRUCIAL pour résoudre "no such file or directory")
+# Le script run.sh doit être dans le dossier de l'addon.
+COPY run.sh /run.sh
+COPY rest_server.py /rest_server.py
+COPY toggle_keyboard.py /toggle_keyboard.py
+
+# Rendre les scripts exécutables
 RUN chmod a+x /run.sh
 
-COPY rest_server.py /
-COPY toggle_keyboard.py /
-
-# Install python dependencies (aiohttp et cherrypy sont nécessaires pour le serveur REST)
-RUN pip3 install aiohttp cherrypy
-
-# Create log directory and change permissions for files
-RUN mkdir -p /var/log/supervisor && \
-    chmod a+rwx /var/log/supervisor && \
-    chmod a+x /run.sh && \
-    chmod a+x /rest_server.py && \
-    chmod a+x /toggle_keyboard.py
-
-# Final command
+# Définir le point d'entrée pour l'exécution du script principal
+# Cela résout l'erreur "exec /run.sh: no such file or directory"
 CMD ["/run.sh"]
