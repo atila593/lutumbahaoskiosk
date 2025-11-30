@@ -1,0 +1,6 @@
+# Fichier build.yaml
+# Ce fichier dit au Superviseur quelle image Docker de base (BUILD_FROM)
+# utiliser pour chaque architecture listée dans config.yaml.
+aarch64: homeassistant/aarch64-base-alpine:3.18
+amd64: homeassistant/amd64-base-alpine:3.18
+armv7: homeassistant/armv7-base-alpine:3.18
