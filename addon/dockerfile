@@ -2,9 +2,10 @@ ARG BUILD_FROM
 ARG BUILD_ARCH
 ARG BUILD_VERSION
 
-# Nous utilisons BUILD_FROM pour rester multi-arch,
-# Et nous corrigeons potentiellement le problème en utilisant la syntaxe de plateforme
-FROM ${BUILD_FROM} --platform=linux/${BUILD_ARCH}
+# Utilisation de BUILD_FROM comme image de base standard
+# Le superviseur HA s'assure que ${BUILD_FROM} contient déjà le bon tag d'architecture (e.g., :aarch64)
+# On retire la syntaxe --platform=linux/${BUILD_ARCH} qui causait l'erreur.
+FROM ${BUILD_FROM}
 
 # Install necessary dependencies, y compris Firefox ESR
 # Xorg et dépendances d'entrée
@@ -35,7 +36,7 @@ RUN apk update && apk add --no-cache \
     python3-tkinter \
     patch \
     bash \
-    # CORRECTION : Installation de Firefox ESR à la place de Lutumba/Luakit
+    # CORRECTION : Installation de Firefox ESR
     firefox-esr \
     nss \
     # Nettoyage
@@ -48,7 +49,7 @@ ENV DISPLAY=:0
 COPY xorg.conf.default /etc/X11/
 COPY translations/*.yaml /translations/
 
-# NOTE: La ligne ci-dessous (pour luakit) n'est plus nécessaire si on utilise Firefox
+# Nous gardons le COPY de userconf.lua commenté pour référence, mais il est ignoré
 # COPY userconf.lua /root/.config/lutumba/
 
 COPY run.sh /
@@ -61,11 +62,11 @@ COPY toggle_keyboard.py /
 RUN pip3 install aiohttp
 
 # Create log directory and change permissions for files
-RUN mkdir /var/log/supervisor && \
+RUN mkdir -p /var/log/supervisor && \
     chmod a+rwx /var/log/supervisor && \
-    chmod a+rwx /run.sh && \
-    chmod a+rwx /rest_server.py && \
-    chmod a+rwx /toggle_keyboard.py
+    chmod a+x /run.sh && \
+    chmod a+x /rest_server.py && \
+    chmod a+x /toggle_keyboard.py
 
 # Final command
 CMD ["/run.sh"]
