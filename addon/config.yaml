@@ -7,12 +7,9 @@ version: "1.1.1"
 slug: "ha_kiosk_new"
 
 arch:
-
-amd64
-
-aarch64
-
-armv7
+ - amd64
+ - aarch64
+ - armv7
 
 startup: application
 host_network: true
