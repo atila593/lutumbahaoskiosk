@@ -1,5 +1,7 @@
-ARG BUILD_FROM
-FROM ghcr.io/home-assistant/${BUILD_ARCH}-base-debian:latest
+# Dockerfile
+
+# Image de base Debian pour HAOS (HAOS gère le choix d'architecture via config.yaml)
+FROM ghcr.io/home-assistant/amd64-base-debian:latest
 
 # Définir le répertoire de travail
 WORKDIR /
