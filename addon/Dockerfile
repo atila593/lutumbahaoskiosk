@@ -1,7 +1,12 @@
-FROM ghcr.io/home-assistant/amd64-base-debian:latest
+ARG BUILD_FROM
+FROM $BUILD_FROM
 
+# Définir le répertoire de travail
 WORKDIR /
 
+# ----------------------------------------------------------------------
+# Dépendances système
+# ----------------------------------------------------------------------
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         xserver-xorg \
@@ -16,24 +21,34 @@ RUN apt-get update && \
         onboard \
         python3 \
         python3-pip \
+        python3-cherrypy3 \
         curl \
         git \
         tcl \
         tk \
         dbus-x11 && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install CherryPy
-
+# ----------------------------------------------------------------------
+# Copie des fichiers de l'addon
+# ----------------------------------------------------------------------
 COPY run.sh /run.sh
 COPY rest_server.py /rest_server.py
 COPY toggle_keyboard.py /toggle_keyboard.py
 
+# ----------------------------------------------------------------------
+# Fix permissions + suppression CRLF (Windows -> Linux)
+# ----------------------------------------------------------------------
 RUN sed -i 's/\r$//' /run.sh && \
     sed -i 's/\r$//' /rest_server.py && \
     sed -i 's/\r$//' /toggle_keyboard.py && \
-    chmod +x /run.sh /rest_server.py /toggle_keyboard.py
+    chmod +x /run.sh && chmod +x /rest_server.py && chmod +x /toggle_keyboard.py
 
+# ----------------------------------------------------------------------
+# Commande par défaut
+# ----------------------------------------------------------------------
 CMD ["/run.sh"]
+
 
 
