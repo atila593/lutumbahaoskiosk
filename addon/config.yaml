@@ -31,7 +31,9 @@ host_devices:
   - /dev/input
 
 map:
-  addon_config: rw
+  - config:rw
+  - share:rw
+  - media:rw
 
 privileged:
   - SYS_ADMIN
