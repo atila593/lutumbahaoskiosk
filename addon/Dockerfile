@@ -1,6 +1,3 @@
-# ----------------------------------------------------------------------
-# Image de base selon l'architecture
-# ----------------------------------------------------------------------
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
@@ -8,7 +5,7 @@ FROM $BUILD_FROM
 WORKDIR /
 
 # ----------------------------------------------------------------------
-# Dépendances système (Xorg, Firefox, utilitaires)
+# Dépendances système
 # ----------------------------------------------------------------------
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -24,7 +21,7 @@ RUN apt-get update && \
         onboard \
         python3 \
         python3-pip \
-        python3-venv \
+        python3-cherrypy3 \
         curl \
         git \
         tcl \
@@ -34,35 +31,24 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # ----------------------------------------------------------------------
-# Dépendances Python dans un environnement virtuel pour éviter PEP 668
-# ----------------------------------------------------------------------
-RUN python3 -m venv /venv && \
-    /venv/bin/pip install --upgrade pip && \
-    /venv/bin/pip install CherryPy
-
-# ----------------------------------------------------------------------
-# Copier les fichiers de l'addon
+# Copie des fichiers
 # ----------------------------------------------------------------------
 COPY run.sh /run.sh
 COPY rest_server.py /rest_server.py
 COPY toggle_keyboard.py /toggle_keyboard.py
 
 # ----------------------------------------------------------------------
-# Correction CRLF + permissions
+# Fix permissions + suppression CRLF
 # ----------------------------------------------------------------------
-RUN sed -i 's/\r$//' /run.sh /rest_server.py /toggle_keyboard.py && \
-    chmod +x /run.sh /rest_server.py /toggle_keyboard.py
+RUN sed -i 's/\r$//' /run.sh && \
+    sed -i 's/\r$//' /rest_server.py && \
+    sed -i 's/\r$//' /toggle_keyboard.py && \
+    chmod +x /run.sh && chmod +x /rest_server.py && chmod +x /toggle_keyboard.py
 
 # ----------------------------------------------------------------------
-# Utiliser le virtualenv pour exécuter le serveur Python
-# ----------------------------------------------------------------------
-ENV PATH="/venv/bin:$PATH"
-
-# ----------------------------------------------------------------------
-# Point d'entrée
+# Exécution
 # ----------------------------------------------------------------------
 CMD ["/run.sh"]
-
 
 
 
