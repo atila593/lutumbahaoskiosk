@@ -1,4 +1,4 @@
-FROM ghcr.io/home-assistant/debian-addon-base:latest
+FROM homeassistant/debian-base-amd64:latest
 
 # Arguments pour les architectures (ajustez si besoin)
 ARG BUILD_ARCH
