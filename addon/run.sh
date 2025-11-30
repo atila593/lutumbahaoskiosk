@@ -118,7 +118,7 @@ openbox &
 if [ "${CURSOR_TIMEOUT}" != "-1" ]; then
     bashio::log.info "Démarrage d'Unclutter (Masque le curseur après ${CURSOR_TIMEOUT}s)..."
     # Rend la commande non fatale
-    unclutter -idle "${CURSOR_TIMEOUT}" -root & || true
+    unclutter-xfixes -idle "${CURSOR_TIMEOUT}" -root & || true
 fi
 
 # Clavier virtuel
