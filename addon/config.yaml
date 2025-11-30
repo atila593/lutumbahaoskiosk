@@ -8,9 +8,10 @@ arch:
   - amd64
   - armv7
 build_from:
-  amd64: ghcr.io/home-assistant/debian-addon-base:latest
-  aarch64: ghcr.io/home-assistant/debian-addon-base:latest
-  armv7: ghcr.io/home-assistant/debian-addon-base:latest
+  amd64: ghcr.io/home-assistant/amd64-base-debian:latest
+  aarch64: ghcr.io/home-assistant/aarch64-base-debian:latest
+  armv7: ghcr.io/home-assistant/armv7-base-debian:latest
+
 map:
   - config:rw
   - share:rw
