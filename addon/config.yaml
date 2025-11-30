@@ -1,45 +1,30 @@
-name: "HA Kiosk Display New"
-description: |
-  Lance le serveur X-Windows et le navigateur Lutumba pour afficher les tableaux de bord en mode kiosque sur le serveur HAOS local.
-version: "1.0.2"
-
-slug: "ha_kiosk_new"
-
+name: "Firefox HAOS Kiosk"
+version: "1.0.3" # Version incrémentée pour forcer la reconstruction
+slug: "firefox_haos_kiosk"
+description: "Firefox en mode Kiosk pour Home Assistant OS, avec auto-login et fonctionnalités REST API."
+url: "https://github.com/atila593/lutumbahaoskiosk" # Votre lien Github
 arch:
-  - amd64
   - aarch64
+  - amd64
   - armv7
-
 build_from:
-  amd64: ghcr.io/home-assistant/amd64-base-debian:latest
-  aarch64: ghcr.io/home-assistant/aarch64-base-debian:latest
-  armv7: ghcr.io/home-assistant/armv7-base-debian:latest
-
-startup: application
-host_network: true
-init: false
-ingress: true
-homeassistant_api: true
-auth_api: true
-
-devices:
-  - /dev/dri/card0
-  - /dev/dri/card1
-  - /dev/dri/renderD128
-
-host_devices:
-  - /dev/input
-
+  amd64: ghcr.io/home-assistant/debian-addon-base:latest
+  aarch64: ghcr.io/home-assistant/debian-addon-base:latest
+  armv7: ghcr.io/home-assistant/debian-addon-base:latest
 map:
   - config:rw
   - share:rw
   - media:rw
-
-privileged:
-  - SYS_ADMIN
-
+host_network: true
+host_dbus: true
+ports:
+  8080/tcp: null # Port par défaut pour l'API REST
+ports_description:
+  8080/tcp: "REST API port for remote commands (exec_js, refresh)"
 options:
-  ha_url: "http://localhost:8123"
+  ha_username: ""
+  ha_password: ""
+  ha_url: "http://homeassistant.local:8123"
   ha_dashboard: ""
   login_delay: 1.0
   zoom_level: 100
@@ -47,41 +32,40 @@ options:
   screen_timeout: 0
   output_number: 1
   dark_mode: true
-  ha_sidebar: "hidden"
+  ha_sidebar: false
   rotate_display: "normal"
-  map_touch_inputs: true
-  keyboard_layout: fr
+  map_touch_inputs: false
   cursor_timeout: 5
+  keyboard_layout: "fr"
   onscreen_keyboard: false
   save_onscreen_config: true
   xorg_conf: ""
   xorg_append_replace: "append"
-  allow_user_commands: false
   rest_port: 8080
-  rest_bearer_token: ""
+  rest_authorization_token: ""
+  allow_user_commands: false
   debug_mode: false
-
 schema:
   ha_username: str
   ha_password: password
   ha_url: str
   ha_dashboard: str
   login_delay: float
-  zoom_level: int(1,300)
-  browser_refresh: int(0,3600)
-  screen_timeout: int(0,3600)
-  output_number: int(1,4)
+  zoom_level: int
+  browser_refresh: int
+  screen_timeout: int
+  output_number: int
   dark_mode: bool
-  ha_sidebar: list(none|hidden|visible|top)
-  rotate_display: list(normal|left|inverted|right)
+  ha_sidebar: bool
+  rotate_display: list(normal|left|right|inverted)
   map_touch_inputs: bool
-  cursor_timeout: int(0,3600)
+  cursor_timeout: int
   keyboard_layout: str
   onscreen_keyboard: bool
   save_onscreen_config: bool
   xorg_conf: str
   xorg_append_replace: list(append|replace)
-  rest_port: port
-  rest_bearer_token: str
+  rest_port: int
+  rest_authorization_token: str
   allow_user_commands: bool
   debug_mode: bool
