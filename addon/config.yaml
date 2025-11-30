@@ -1,6 +1,6 @@
 name: "Firefox HAOS Kiosk"
-version: "1.0.3" # Version incrémentée pour forcer la reconstruction
-slug: "firefox_haos_kiosk"
+version: "1.0.0" # Version initiale pour le nouveau slug
+slug: "kiosk_firefox_final" # NOUVEAU SLUG pour éviter les problèmes de cache
 description: "Firefox en mode Kiosk pour Home Assistant OS, avec auto-login et fonctionnalités REST API."
 url: "https://github.com/atila593/lutumbahaoskiosk" # Votre lien Github
 arch:
