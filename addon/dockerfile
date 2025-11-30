@@ -1,9 +1,12 @@
 ARG BUILD_FROM
-# Utilisation de BUILD_FROM comme image de base standard
-FROM homeassistant/amd64-base-alpine:3.18
+ARG BUILD_ARCH
+ARG BUILD_VERSION
 
-# Install necessary dependencies, y compris Firefox ESR
-# Xorg et dépendances d'entrée
+# CORRECTION FINALE : Utilisation de l'image de base Alpine publique
+# Nous utilisons 'alpine:3.18' qui est accessible publiquement, au lieu de l'image interne de HA.
+FROM alpine:3.18
+
+# Install necessary dependencies, y compris Firefox ESR, Xorg et dépendances d'entrée
 RUN apk update && apk add --no-cache \
     xorg-server \
     xf86-video-modesetting \
@@ -31,12 +34,11 @@ RUN apk update && apk add --no-cache \
     python3-tkinter \
     patch \
     bash \
-    # Ajout crucial de xclip pour la gestion du presse-papiers et l'injection JS
     xclip \
-    # CORRECTION : Installation de Firefox ESR
     firefox-esr \
     nss \
-    # Nettoyage
+    # Ajout d'une dépendance pour garantir la compatibilité Python/pip3 avec les paquets Alpine 
+    py3-cryptography \
     && rm -rf /var/cache/apk/*
 
 # Set the display variable
@@ -46,17 +48,14 @@ ENV DISPLAY=:0
 COPY xorg.conf.default /etc/X11/
 COPY translations/*.yaml /translations/
 
-# Nous gardons le COPY de userconf.lua commenté pour référence, mais il est ignoré
-# COPY userconf.lua /root/.config/lutumba/
-
 COPY run.sh /
 RUN chmod a+x /run.sh
 
 COPY rest_server.py /
 COPY toggle_keyboard.py /
 
-# Install python dependencies
-RUN pip3 install aiohttp
+# Install python dependencies (aiohttp et cherrypy sont nécessaires pour le serveur REST)
+RUN pip3 install aiohttp cherrypy
 
 # Create log directory and change permissions for files
 RUN mkdir -p /var/log/supervisor && \
