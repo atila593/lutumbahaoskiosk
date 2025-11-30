@@ -3,8 +3,6 @@ ARG BUILD_ARCH
 ARG BUILD_VERSION
 
 # Utilisation de BUILD_FROM comme image de base standard
-# Le superviseur HA s'assure que ${BUILD_FROM} contient déjà le bon tag d'architecture (e.g., :aarch64)
-# On retire la syntaxe --platform=linux/${BUILD_ARCH} qui causait l'erreur.
 FROM ${BUILD_FROM}
 
 # Install necessary dependencies, y compris Firefox ESR
@@ -36,6 +34,8 @@ RUN apk update && apk add --no-cache \
     python3-tkinter \
     patch \
     bash \
+    # Ajout crucial de xclip pour la gestion du presse-papiers et l'injection JS
+    xclip \
     # CORRECTION : Installation de Firefox ESR
     firefox-esr \
     nss \
