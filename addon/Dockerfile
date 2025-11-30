@@ -45,12 +45,13 @@ RUN \
             xdotool \
             xclip \
             setxkbmap \
-            unclutter \
+            unclutter-xfixes \
             openbox \
             firefox \
             onboard \
             python3 \
             py3-pip \
+            python3-tkinter \
             curl \
             git \
             tcl \
