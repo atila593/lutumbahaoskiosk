@@ -1,5 +1,5 @@
 ARG BUILD_FROM
-FROM $BUILD_FROM
+FROM ghcr.io/home-assistant/${BUILD_ARCH}-base-debian:latest
 
 # Définir le répertoire de travail
 WORKDIR /
