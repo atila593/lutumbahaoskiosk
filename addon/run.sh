@@ -1,380 +1,495 @@
-#!/usr/bin/with-contenv bashio
-set -e
+!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+VERSION="1.1.1"
+################################################################################
+#
+#  Code does the following:
+#     - Import and sanity-check the following variables from HA/config.yaml
+#         HA_USERNAME
+#         HA_PASSWORD
+#         HA_URL
+#         HA_DASHBOARD
+#         LOGIN_DELAY
+#         ZOOM_LEVEL
+#         BROWSER_REFRESH
+#         SCREEN_TIMEOUT
+#         OUTPUT_NUMBER
+#         DARK_MODE
+#         HA_SIDEBAR
+#         ROTATE_DISPLAY
+#         MAP_TOUCH_INPUTS
+#         CURSOR_TIMEOUT
+#         KEYBOARD_LAYOUT
+#         ONSCREEN_KEYBOARD
+#         SAVE_ONSCREEN_CONFIG
+#         XORG_CONF
+#         XORG_APPEND_REPLACE
+#         REST_PORT
+#         REST_BEARER_TOKEN
+#         ALLOW_USER_COMMANDS
+#         DEBUG_MODE
+#
+#     - Hack to delete (and later restore) /dev/tty0 (needed for X to start
+#       and to prevent udev permission errors))
+#     - Start udev
+#     - Hack to manually tag USB input devices (in /dev/input) for libinput
+#     - Start X window system
+#     - Stop console cursor blinking
+#     - Start Openbox window manager
+#     - Set up (enable/disable) screen timeouts
+#     - Rotate screen per configuration
+#     - Map touch inputs per configuration
+#     - Set keyboard layout and language
+#     - Set up onscreen keyboard per configuration
+#     - Start REST API server
+#     - Launch fresh Luakit browser for url: $HA_URL/$HA_DASHBOARD
+#       [If not in DEBUG_MODE; Otherwise, just sleep]
+#
+################################################################################
+echo "." #Almost blank line (Note totally blank or white space lines are swallowed)
+printf '%*s\n' 80 '' | tr ' ' '#' #Separator
+bashio::log.info "######## Starting HAOSKiosk ########"
+bashio::log.info "$(date) [Version: $VERSION]"
+bashio::log.info "$(uname -a)"
+ha_info=$(bashio::info)
+bashio::log.info "Core=$(echo "$ha_info" | jq -r '.homeassistant')  HAOS=$(echo "$ha_info" | jq -r '.hassos')  MACHINE=$(echo "$ha_info" | jq -r '.machine')  ARCH=$(echo "$ha_info" | jq -r '.arch')"
 
-bashio::log.info "Démarrage du Kiosque Firefox HAOS..."
-
-# ------------------------------------------------------------------------------
-# 1. CONFIGURATION & VARIABLES
-# ------------------------------------------------------------------------------
-
-# Récupération de toutes les variables de configuration (identiques à l'original)
-HA_USERNAME=$(bashio::config 'ha_username')
-HA_PASSWORD=$(bashio::config 'ha_password')
-HA_URL=$(bashio::config 'ha_url')
-HA_DASHBOARD=$(bashio::config 'ha_dashboard')
-LOGIN_DELAY=$(bashio::config 'login_delay')
-ZOOM_LEVEL=$(bashio::config 'zoom_level')
-BROWSER_REFRESH=$(bashio::config 'browser_refresh')
-SCREEN_TIMEOUT=$(bashio::config 'screen_timeout')
-OUTPUT_NUMBER=$(bashio::config 'output_number')
-DARK_MODE=$(bashio::config 'dark_mode')
-HA_SIDEBAR=$(bashio::config 'ha_sidebar')
-ROTATE_DISPLAY=$(bashio::config 'rotate_display')
-MAP_TOUCH_INPUTS=$(bashio::config 'map_touch_inputs')
-CURSOR_TIMEOUT=$(bashio::config 'cursor_timeout')
-KEYBOARD_LAYOUT=$(bashio::config 'keyboard_layout')
-ONSCREEN_KEYBOARD=$(bashio::config 'onscreen_keyboard')
-SAVE_ONSCREEN_CONFIG=$(bashio::config 'save_onscreen_config')
-XORG_CONF=$(bashio::config 'xorg_conf')
-XORG_APPEND_REPLACE=$(bashio::config 'xorg_append_replace')
-REST_PORT=$(bashio::config 'rest_port')
-REST_AUTHORIZATION_TOKEN=$(bashio::config 'rest_authorization_token')
-ALLOW_USER_COMMANDS=$(bashio::config 'allow_user_commands')
-DEBUG_MODE=$(bashio::config 'debug_mode')
-
-# Définition de l'URL cible
-if [ -n "${HA_DASHBOARD}" ]; then
-    TARGET_URL="${HA_URL}/lovelace/${HA_DASHBOARD}"
-else
-    TARGET_URL="${HA_URL}"
-fi
-
-# Définition du répertoire de profil Firefox
-PROFILE_DIR="/config/firefox_profile"
-mkdir -p "${PROFILE_DIR}"
-
-# ------------------------------------------------------------------------------
-# 2. XORG CONFIGURATION & DISPLAY STARTUP (Fix du PID 1/s6-overlay)
-# ------------------------------------------------------------------------------
-
-XORG_CONFIG_FILE="/etc/X11/xorg.conf"
-DEFAULT_CONFIG_FILE="/xorg.conf.default" # Le fichier fourni dans l'addon
-CUSTOM_XORG_CONF=$(bashio::config 'xorg_conf')
-
-# 2.1 Préparation du fichier xorg.conf
-if [ ! -f "${DEFAULT_CONFIG_FILE}" ]; then
-    bashio::log.error "Le fichier de configuration par défaut Xorg (${DEFAULT_CONFIG_FILE}) est manquant."
-    # Si le fichier par défaut est manquant, on crée un fichier minimal (solution de dernier recours)
-    echo "Section \"ServerLayout\"" > "${XORG_CONFIG_FILE}"
-    echo "    Identifier \"DefaultLayout\"" >> "${XORG_CONFIG_FILE}"
-    echo "    Screen 0 \"Screen0\" 0 0" >> "${XORG_CONFIG_FILE}"
-    echo "EndSection" >> "${XORG_CONFIG_FILE}"
-    bashio::log.info "Création d'un fichier xorg.conf minimal en dernier recours."
-else
-    # 2.2 Application de la configuration personnalisée
-    if bashio::config.is_set 'xorg_conf'; then
-        if [ "${XORG_APPEND_REPLACE}" == "replace" ]; then
-            # Remplacer entièrement le fichier
-            bashio::log.info "Remplacement de la configuration Xorg ('replace')."
-            echo "${CUSTOM_XORG_CONF}" > "${XORG_CONFIG_FILE}"
-        else
-            # Utiliser 'append' (par défaut ou si mode inconnu)
-            bashio::log.info "Création de xorg.conf à partir du défaut, puis ajout ('append')."
-            cp "${DEFAULT_CONFIG_FILE}" "${XORG_CONFIG_FILE}"
-            echo -e "\n# --- Custom Configuration ---\n${CUSTOM_XORG_CONF}\n# ----------------------------" >> "${XORG_CONFIG_FILE}"
-        fi
-    else
-        # Utiliser la configuration par défaut sans personnalisation
-        cp "${DEFAULT_CONFIG_FILE}" "${XORG_CONFIG_FILE}"
-        bashio::log.info "Utilisation de la configuration Xorg par défaut (pas de personnalisation)."
+#### Clean up on exit:
+TTY0_DELETED="" #Need to set to empty string since runs with nounset=on (like set -u)
+ONBOARD_CONFIG_FILE="/config/onboard-settings.dconf"
+cleanup() {
+    local exit_code=$?
+    if [ "$SAVE_ONSCREEN_CONFIG" = true ]; then
+        dconf dump /org/onboard/ > "$ONBOARD_CONFIG_FILE"
     fi
-fi
+    jobs -p | xargs -r kill
+    [ -n "$TTY0_DELETED" ] && mknod -m 620 /dev/tty0 c 4 0
+    exit "$exit_code"
+}
+trap cleanup HUP INT QUIT ABRT TERM EXIT
 
+################################################################################
+#### Get config variables from HA add-on & set environment variables
+load_config_var() {
+    # First, use existing variable if already set (for debugging purposes)
+    # If not set, lookup configuration value
+    # If null, use optional second parameter or else ""
+    local VAR_NAME="$1"
+    local DEFAULT="${2:-}"
+    local MASK="${3:-}"
 
-# 2.3 Lancement de Xorg (Méthode simple pour s6-overlay)
-bashio::log.info "Démarrage du serveur Xorg..."
+    local VALUE
+    #Check if $VAR_NAME exists before getting its value since 'set +x' mode
+    if declare -p "$VAR_NAME" >/dev/null 2>&1; then #Variable exist, get its value
+        VALUE="${!VAR_NAME}"
+    elif bashio::config.exists "${VAR_NAME,,}"; then
+        VALUE="$(bashio::config "${VAR_NAME,,}")"
+    else
+        bashio::log.warning "Unknown config key: ${VAR_NAME,,}"
+    fi
 
-# Nettoyage des verrous X11 précédents (anti-crash)
-rm -f /tmp/.X0-lock
+    if [ "$VALUE" = "null" ] || [ -z "$VALUE" ]; then
+        bashio::log.warning "Config key '${VAR_NAME,,}' unset, setting to default: '$DEFAULT'"
+        VALUE="$DEFAULT"
+    fi
 
-# Lancement direct de l'exécutable Xorg en arrière-plan
-Xorg :0 -config "${XORG_CONFIG_FILE}" -nolisten tcp -vt"${OUTPUT_NUMBER}" &
-XORG_PID=$!
+    # Assign and export safely using 'printf -v' and 'declare -x'
+    printf -v "$VAR_NAME" '%s' "$VALUE"
+    eval "export $VAR_NAME"
 
-# Attendre que le serveur X soit opérationnel
-# On teste l'existence du fichier de socket de l'écran 0.
-X_SOCKET_PATH="/tmp/.X11-unix/X0"
-X_WAIT_TIMEOUT=15
-X_WAIT_COUNT=0
-bashio::log.info "Attente du démarrage du serveur Xorg (max ${X_WAIT_TIMEOUT}s)..."
-while [ ! -e "${X_SOCKET_PATH}" ] && [ $X_WAIT_COUNT -lt $X_WAIT_TIMEOUT ]; do
-    sleep 1
-    X_WAIT_COUNT=$((X_WAIT_COUNT + 1))
-done
+    if [ -z "$MASK" ]; then
+        bashio::log.info "$VAR_NAME=$VALUE"
+    else
+        bashio::log.info "$VAR_NAME=XXXXXX"
+    fi
+}
 
-if [ ! -e "${X_SOCKET_PATH}" ]; then
-    bashio::log.error "Le serveur Xorg n'a pas démarré après ${X_WAIT_COUNT} secondes. Arrêt de l'addon."
-    # On force la sortie pour que l'addon se redémarre (si configuré)
+load_config_var HA_USERNAME
+load_config_var HA_PASSWORD "" 1 #Mask password in log
+load_config_var HA_URL "http://localhost:8123"
+load_config_var HA_DASHBOARD ""
+load_config_var LOGIN_DELAY 1.0
+load_config_var ZOOM_LEVEL 100
+load_config_var BROWSER_REFRESH 600
+load_config_var SCREEN_TIMEOUT 600 # Default to 600 seconds
+load_config_var OUTPUT_NUMBER 1 # Which *CONNECTED* Physical video output to use (Defaults to 1)
+#NOTE: By only considering *CONNECTED* output, this maximizes the chance of finding an output
+#      without any need to change configs. Set to 1, unless you have multiple video outputs connected.
+load_config_var DARK_MODE true
+load_config_var HA_SIDEBAR "none"
+load_config_var ROTATE_DISPLAY normal
+load_config_var MAP_TOUCH_INPUTS true
+load_config_var CURSOR_TIMEOUT 5 #Default to 5 seconds
+load_config_var KEYBOARD_LAYOUT us
+load_config_var ONSCREEN_KEYBOARD false
+load_config_var SAVE_ONSCREEN_CONFIG true
+load_config_var XORG_CONF ""
+load_config_var XORG_APPEND_REPLACE append
+load_config_var REST_PORT 8080
+load_config_var REST_BEARER_TOKEN "" 1 #Mask token in log
+load_config_var ALLOW_USER_COMMANDS false
+[ "$ALLOW_USER_COMMANDS" = "true" ] && bashio::log.warning "WARNING: 'allow_user_commands' set to 'true'"
+load_config_var DEBUG_MODE false
+
+# Validate environment variables set by config.yaml
+if [ -z "$HA_USERNAME" ] || [ -z "$HA_PASSWORD" ]; then
+    bashio::log.error "Error: HA_USERNAME and HA_PASSWORD must be set"
     exit 1
 fi
 
-bashio::log.info "Serveur Xorg démarré avec succès."
+################################################################################
+#### Start Dbus
+# Avoids waiting for DBUS timeouts (e.g., luakit)
+# Allows luakit to enforce unique instance by default
+# Note do *not* use '-U' flag when calling luakit
+# Subsequent calls to 'luakit' exit post launch, leaving just the original process
+# Not 'userconf.lua' includes code to turn off session restore.
+# Note if entering through a separate shell, need to export the original
+# DBUS_SESSION_BUS_ADDRESS variable so that processes can communicate.
 
-# Export DISPLAY pour toutes les applications graphiques suivantes (Openbox, Firefox, xrandr, setxkbmap...)
-export DISPLAY=:0
+DBUS_SESSION_BUS_ADDRESS=$(dbus-daemon --session --fork --print-address)
+if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
+    bashio::log.warning "WARNING: Failed to start dbus-daemon"
+fi
+bashio::log.info "DBus started with: DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS"
+export DBUS_SESSION_BUS_ADDRESS
+#Make available to subsequent shells
+echo "export DBUS_SESSION_BUS_ADDRESS='$DBUS_SESSION_BUS_ADDRESS'" >> "$HOME/.profile"
 
+#### Hack to get writable /dev/tty0 for X
+# Note first need to delete /dev/tty0 since X won't start if it is there,
+# because X doesn't have permissions to access it in the container
+# Also, prevents udev permission error warnings & issues
+# Note that remounting rw is not sufficient
 
-# ------------------------------------------------------------------------------
-# 3. GESTIONNAIRE DE FENÊTRES & UTILITAIRES GRAPHIQUES (Déplacé après le démarrage de Xorg)
-# ------------------------------------------------------------------------------
-
-# Lancement du gestionnaire de fenêtres Openbox
-bashio::log.info "Démarrage du gestionnaire de fenêtres Openbox..."
-openbox &
-OPENBOX_PID=$!
-
-# Donner un petit moment à Openbox pour s'initialiser et permettre aux outils graphiques de fonctionner
-sleep 1
-
-# 3.1 Configuration de la rotation de l'écran (maintenant que Xorg est prêt)
-if [ "${ROTATE_DISPLAY}" != "normal" ]; then
-    bashio::log.info "Application de la rotation d'écran : ${ROTATE_DISPLAY}"
-    # On itère sur tous les écrans connectés pour appliquer la rotation.
-    XRANDR_OUTPUT=$(xrandr -q | grep ' connected' | awk '{print $1}')
-    if [ -z "${XRANDR_OUTPUT}" ]; then
-        bashio::log.warning "Aucun écran connecté trouvé par xrandr. Impossible d'appliquer la rotation."
-    else
-        for OUTPUT in ${XRANDR_OUTPUT}; do
-            bashio::log.info "Rotation de l'écran ${OUTPUT} vers ${ROTATE_DISPLAY}."
-            # L'opérateur '|| bashio::log.warning' est utilisé pour capturer les erreurs sans stopper le script
-            xrandr --output "${OUTPUT}" --rotate "${ROTATE_DISPLAY}" || bashio::log.warning "Échec de l'application de xrandr pour ${OUTPUT}."
-        done
+# First, remount /dev as read-write since X absolutely, must have /dev/tty access
+# Note: need to use the version of 'mount' in util-linux, not busybox
+# Note: Do *not* later remount as 'ro' since that affect the root fs and
+#       in particular will block HAOS updates
+if [ -e "/dev/tty0" ]; then
+    bashio::log.info "Attempting to remount /dev as 'rw' so we can (temporarily) delete /dev/tty0..."
+    mount -o remount,rw /dev
+    if ! mount -o remount,rw /dev ; then
+        bashio::log.error "Failed to remount /dev as read-write..."
+        exit 1
     fi
-else
-    bashio::log.info "Aucune rotation d'écran spécifiée ('normal')."
-fi
-
-# 3.2 Configuration du clavier (maintenant que Xorg est prêt)
-if [ -n "${KEYBOARD_LAYOUT}" ]; then
-    bashio::log.info "Configuration du clavier : setxkbmap ${KEYBOARD_LAYOUT}"
-    setxkbmap "${KEYBOARD_LAYOUT}" || bashio::log.warning "Échec de l'application de setxkbmap pour la disposition ${KEYBOARD_LAYOUT}."
-else
-    bashio::log.info "Aucune configuration de clavier spécifiée."
-fi
-
-# 3.3 Gestion de l'extinction d'écran via xset
-if [ "${SCREEN_TIMEOUT}" != "0" ]; then
-    bashio::log.info "Configuration de l'extinction d'écran après ${SCREEN_TIMEOUT} secondes."
-    xset s "${SCREEN_TIMEOUT}" || true
-    xset dpms 0 0 0 || true
-    xset s activate || true
-else
-    bashio::log.info "Désactivation de l'extinction d'écran."
-    xset s off || true
-    xset -dpms || true
-fi
-
-# 3.4 Lancement de l'utilitaire unclutter (pour cacher le curseur)
-if bashio::config.is_not_set 'cursor_timeout' || [ "$(bashio::config 'cursor_timeout')" -gt 0 ]; then
-    TIMEOUT_SECONDS=$(bashio::config 'cursor_timeout')
-    bashio::log.info "Démarrage d'unclutter (cache le curseur après ${TIMEOUT_SECONDS}s)."
-    # Utiliser unclutter-xfixes si disponible, sinon la version simple
-    if command -v unclutter-xfixes &> /dev/null; then
-        unclutter-xfixes -idle "${TIMEOUT_SECONDS}" -root &
-    else
-        unclutter -idle "${TIMEOUT_SECONDS}" -root -noevents &
+    if  ! rm -f /dev/tty0 ; then
+        bashio::log.error "Failed to delete /dev/tty0..."
+        exit 1
     fi
-    UNCLUTTER_PID=$!
+    TTY0_DELETED=1
+    bashio::log.info "Deleted /dev/tty0 successfully..."
 fi
 
-# 3.5 Lancement du clavier virtuel 'onboard'
-if bashio::config.true 'onscreen_keyboard'; then
-    bashio::log.info "Démarrage du clavier virtuel Onboard..."
-    # Onboard est lancé en arrière-plan
-    onboard -l "${KEYBOARD_LAYOUT}" &
-    ONBOARD_PID=$!
-    
-    # Lancement du petit bouton pour basculer le clavier
-    bashio::log.info "Démarrage du bouton de bascule du clavier (toggle_keyboard.py)..."
-    python3 /toggle_keyboard.py &
-    TOGGLE_PID=$!
+#### Start udev (used by X)
+bashio::log.info "Starting 'udevd' and (re-)triggering..."
+if ! udevd --daemon || ! udevadm trigger; then
+    bashio::log.warning "WARNING: Failed to start udevd or trigger udev, input devices may not work"
 fi
 
-# 3.6 Démarrage du serveur REST
-bashio::log.info "Démarrage du serveur REST CherryPy..."
-# Le serveur REST est lancé en arrière-plan
-# Le processus doit être lancé en arrière-plan et géré par la boucle principale
-python3 /rest_server.py &
-REST_SERVER_PID=$!
+# Force tagging of event input devices (in /dev/input) to enable recognition by
+# libinput since 'udev' doesn't necessarily trigger their tagging when run from a container.
+echo "/dev/input event devices:"
+for dev in $(find /dev/input/event* | sort -V); do # Loop through all input devices
+    devpath_output=$(udevadm info --query=path --name="$dev" 2>/dev/null; echo -n $?)
+    return_status=${devpath_output##*$'\n'}
+    [ "$return_status" -eq 0 ] || { echo "  $dev: Failed to get device path"; continue; }
+    devpath=${devpath_output%$'\n'*}
+    echo "  $dev: $devpath"
 
-# ------------------------------------------------------------------------------
-# 4. PRÉPARATION ET LANCEMENT DE FIREFOX
-# ------------------------------------------------------------------------------
-
-# 4.1. Application des paramètres Firefox (dark mode, zoom, refresh)
-bashio::log.info "Application des paramètres Firefox : zoom=${ZOOM_LEVEL}%, refresh=${BROWSER_REFRESH}s, dark_mode=${DARK_MODE}."
-
-# Créer un fichier de préférences minimal (prefs.js)
-PREFS_FILE="${PROFILE_DIR}/prefs.js"
-echo "user_pref(\"toolkit.defaultChromeURI\", \"chrome://browser/content/browser.xhtml\");" > "${PREFS_FILE}"
-echo "user_pref(\"browser.sessionstore.resume_from_crash\", false);" >> "${PREFS_FILE}"
-echo "user_pref(\"layout.css.prefers-color-scheme.content-override\", $(if bashio::var.true "${DARK_MODE}"; then echo 2; else echo 1; fi));" >> "${PREFS_FILE}" # 1:light, 2:dark
-
-# Injecter le niveau de zoom dans l'UI et le contenu
-echo "user_pref(\"browser.display.background_content.last_zoom_setting\", ${ZOOM_LEVEL});" >> "${PREFS_FILE}"
-echo "user_pref(\"browser.content.full-zoom\", true);" >> "${PREFS_FILE}"
-# Utiliser bc pour un calcul plus précis et sûr
-echo "user_pref(\"layout.css.devPixelsPerPx\", \"$(echo "scale=2; ${ZOOM_LEVEL} / 100" | bc)\");" >> "${PREFS_FILE}"
-
-# Désactiver la mise en cache (optionnel, mais utile en mode Kiosk)
-echo "user_pref(\"browser.cache.disk.enable\", false);" >> "${PREFS_FILE}"
-echo "user_pref(\"browser.cache.memory.enable\", false);" >> "${PREFS_FILE}"
-echo "user_pref(\"browser.tabs.remote.autostart\", false);" >> "${PREFS_FILE}"
-echo "user_pref(\"browser.tabs.remote.autostart.2\", false);" >> "${PREFS_FILE}"
-echo "user_pref(\"browser.tabs.closeWindowWithLastTab\", false);" >> "${PREFS_FILE}"
-echo "user_pref(\"general.useragent.override\", \"haos_kiosk\");" >> "${PREFS_FILE}" # Pour browser_mod
-
-# 4.2. Génération du script d'injection JS
-# Le script est injecté une fois après le lancement initial de Firefox.
-JS_CODE="
-// Script d'injection dans la page pour les commandes post-chargement
-(function() {
-    const DEBUG_MODE = $(if bashio::var.true "${DEBUG_MODE}"; then echo 'true'; else echo 'false'; fi);
-    const BROWSER_REFRESH = parseInt(\"${BROWSER_REFRESH}\");
-    const HA_SIDEBAR = $(if bashio::var.true "${HA_SIDEBAR}"; then echo 'true'; else echo 'false'; fi);
-    const SCREEN_TIMEOUT = parseInt(\"${SCREEN_TIMEOUT}\");
-
-    if (DEBUG_MODE) console.log('Kiosk Script: Démarrage de l\'injection JS.');
-
-    // 1. Gestion du rafraîchissement périodique
-    if (BROWSER_REFRESH > 0) {
-        if (DEBUG_MODE) console.log('Kiosk Script: Configuration du rafraîchissement toutes les ' + BROWSER_REFRESH + ' secondes.');
-        if (!window.kioskRefreshInterval) {
-            window.kioskRefreshInterval = setInterval(function() {
-                window.location.reload(true);
-            }, BROWSER_REFRESH * 1000);
-        }
-    }
-
-    // 2. Gestion de la sidebar (masquage)
-    if (HA_SIDEBAR === false) {
-        if (DEBUG_MODE) console.log('Kiosk Script: Tentative de masquer la sidebar Home Assistant.');
-        
-        // Fonction pour cacher la sidebar en cliquant sur le bouton menu
-        const attemptHide = () => {
-            try {
-                // Recherche du bouton menu dans le shadow DOM de HA
-                const main = document.querySelector('home-assistant');
-                if (main && main.shadowRoot) {
-                    const haMain = main.shadowRoot.querySelector('home-assistant-main');
-                    if (haMain && haMain.shadowRoot) {
-                        const toolbar = haMain.shadowRoot.querySelector('app-header').querySelector('app-toolbar');
-                        if (toolbar) {
-                            // Clic sur l'icône du menu (le premier ha-icon-button dans la barre)
-                            const menuButton = toolbar.querySelector('ha-icon-button');
-                            if (menuButton && menuButton.getAttribute('icon') === 'mdi:menu') {
-                                menuButton.click();
-                                if (DEBUG_MODE) console.log('Kiosk Script: Sidebar masquée via clic sur le menu.');
-                                return true;
-                            }
-                        }
-                    }
-                }
-            } catch (e) {
-                if (DEBUG_MODE) console.error('Kiosk Script: Erreur lors du masquage de la sidebar:', e);
-            }
-            return false;
-        };
-
-        // Essayer de masquer immédiatement, puis réessayer après un court délai au cas où le chargement est lent
-        if (!attemptHide()) {
-             setTimeout(attemptHide, 2000);
-             setTimeout(attemptHide, 5000); // Seconde tentative
-        }
-    }
-
-    // 3. Gestion du timeout de l'écran (si > 0)
-    if (SCREEN_TIMEOUT > 0) {
-        if (DEBUG_MODE) console.log('Kiosk Script: Configuration du timeout d\'écran après ' + SCREEN_TIMEOUT + ' secondes d\'inactivité.');
-        let timeoutHandle;
-        const REST_PORT = \"${REST_PORT}\";
-        const AUTH_TOKEN = \"${REST_AUTHORIZATION_TOKEN}\";
-
-        function sendCommand(command) {
-            fetch(\`http://127.0.0.1:\${REST_PORT}/url_command\`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    command: command,
-                    authorization_token: AUTH_TOKEN
-                })
-            }).catch(e => {
-                if (DEBUG_MODE) console.error(\`Kiosk Script: Erreur lors de la commande \${command}:\`, e);
-            });
-        }
-        
-        function turnScreenOff() {
-            if (DEBUG_MODE) console.log('Kiosk Script: Inactivité détectée. Extinction de l\'écran (via API REST).');
-            sendCommand('screen_off');
-        }
-        
-        function resetTimer() {
-            clearTimeout(timeoutHandle);
-            timeoutHandle = setTimeout(turnScreenOff, SCREEN_TIMEOUT * 1000);
-            
-            // Si l'écran était éteint, cette activité le rallumera
-            sendCommand('screen_on');
-        }
-
-        ['mousemove', 'mousedown', 'keydown', 'touchstart'].forEach(event => {
-            document.addEventListener(event, resetTimer, { passive: true });
-        });
-        
-        // Démarrer le timer initial
-        resetTimer();
-    }
-    
-})();
-"
-
-# Rendre le script accessible pour l'injection via xdotool
-JS_INJECTION_FILE="/home_assistant_kiosk.js"
-echo "${JS_CODE}" > "${JS_INJECTION_FILE}"
-
-# Copier le JS dans le presse-papiers pour l'injection par xdotool
-echo "${JS_CODE}" | xclip -selection clipboard
-
-bashio::log.info "Attente de ${LOGIN_DELAY} secondes avant le lancement de Firefox..."
-sleep "${LOGIN_DELAY}"
-
-
-bashio::log.info "Démarrage de Firefox à l'URL : ${TARGET_URL}"
-
-# Boucle de surveillance : si Firefox crash, on le relance
-while true; do
-    # On lance Firefox en mode Kiosk
-    firefox-esr \
-        --kiosk \
-        --no-remote \
-        --profile "${PROFILE_DIR}" \
-        "${TARGET_URL}" &
-    
-    FIREFOX_PID=$!
-    
-    # Attendre que la fenêtre Firefox soit visible
-    sleep 5
-    
-    # Injection du script JS : Ouvre la console, colle le script, appuie sur Entrée, et ferme la console.
-    bashio::log.info "Tentative d'injection du script JS (Sidebar/Refresh/Timeout)."
-    # On envoie Ctrl+Shift+K (console), on tape ce qui est dans le presse-papiers, Entrée, Échap (fermeture)
-    # On utilise search + windowfocus pour s'assurer que l'injection cible Firefox, même si la fenêtre n'a pas encore le focus
-    # On ajoute un délai après la recherche pour que la fenêtre soit vraiment prête à recevoir les frappes
-    xdotool search --name "Mozilla Firefox" --onlyvisible --pid "${FIREFOX_PID}" windowfocus key --delay 200 "control+shift+k" type --delay 100 --clearmodifiers "$(xclip -o -selection clipboard)" key "Return" key "Escape" 2>/dev/null || bashio::log.warning "Échec de l'injection JavaScript via xdotool. Le script d'auto-login/refresh peut ne pas s'être exécuté."
-
-
-    # Attendre que Firefox se termine.
-    wait $FIREFOX_PID
-    
-    # Si on arrive ici, Firefox a crashé ou a été fermé
-    bashio::log.warning "Firefox s'est arrêté (PID: ${FIREFOX_PID}). Redémarrage dans 5 secondes..."
-    sleep 5
+    # Simulate a udev event to trigger (re)load of all properties
+    udevadm test "$devpath" >/dev/null 2>&1 || echo "$dev: No valid udev rule found..."
 done
 
-# ------------------------------------------------------------------------------
-# 5. NETTOYAGE (normalement jamais atteint)
-# ------------------------------------------------------------------------------
+udevadm settle --timeout=10 #Wait for udev event processing to complete
 
-# Arrêter les processus en arrière-plan si la boucle s'arrêtait
-kill $XORG_PID $OPENBOX_PID $REST_SERVER_PID $ONBOARD_PID $TOGGLE_PID 2>/dev/null
-bashio::log.info "Arrêt de l'addon."
-exit 0
+# Show discovered libinput devices
+echo "libinput list-devices found:"
+libinput list-devices 2>/dev/null | awk '
+  /^Device:/ {devname=substr($0, 9)}
+  /^Kernel:/ {
+    split($2, a, "/");
+    printf "  %s: %s\n", a[length(a)], devname
+}' | sort -V
+
+## Determine main display card
+bashio::log.info "DRM video cards:"
+find /dev/dri/ -maxdepth 1 -type c -name 'card[0-9]*' 2>/dev/null | sed 's/^/  /'
+bashio::log.info "DRM video card driver and connection status:"
+selected_card=""
+for status_path in /sys/class/drm/card[0-9]*-*/status; do
+    [ -e "$status_path" ] || continue  # Skip if status file doesn't exist
+
+    status=$(cat "$status_path")
+    card_port=$(basename "$(dirname "$status_path")")
+    card=${card_port%%-*}
+    driver=$(basename "$(readlink "/sys/class/drm/$card/device/driver")")
+    if [ -z "$selected_card" ]  && [ "$status" = "connected" ]; then
+        selected_card="$card" # Select first connected card
+        printf "  *"
+    else
+        printf "   "
+    fi
+    printf "%-25s%-20s%s\n" "$card_port" "$driver" "$status"
+done
+if [ -z "$selected_card" ]; then
+    bashio::log.info "ERROR: No connected video card detected. Exiting.."
+    exit 1
+fi
+
+#### Start Xorg in the background
+rm -rf /tmp/.X*-lock #Cleanup old versions
+
+# Modify 'xorg.conf' as appropriate
+if [[ -n "$XORG_CONF" && "${XORG_APPEND_REPLACE}" = "replace" ]]; then
+    bashio::log.info "Replacing default 'xorg.conf'..."
+    echo "${XORG_CONF}" >| /etc/X11/xorg.conf
+else
+    cp -a /etc/X11/xorg.conf{.default,}
+    #Add "kmsdev" line to Device Section based on 'selected_card'
+    sed -i "/Option[[:space:]]\+\"DRI\"[[:space:]]\+\"3\"/a\    Option     \t\t\"kmsdev\" \"/dev/dri/$selected_card\"" /etc/X11/xorg.conf
+
+    if [ -z "$XORG_CONF" ]; then
+        bashio::log.info "No user 'xorg.conf' data provided, using default..."
+    elif [ "${XORG_APPEND_REPLACE}" = "append" ]; then
+        bashio::log.info "Appending onto default 'xorg.conf'..."
+        echo -e "\n#\n${XORG_CONF}" >> /etc/X11/xorg.conf
+    fi
+fi
+
+# Print out current 'xorg.conf'
+echo "." #Almost blank line (Note totally blank or white space lines are swallowed)
+printf '%*s xorg.conf %*s\n' 35 '' 34 '' | tr ' ' '#' #Header
+cat /etc/X11/xorg.conf
+printf '%*s\n' 80 '' | tr ' ' '#' #Trailer
+echo "."
+
+bashio::log.info "Starting X on DISPLAY=$DISPLAY..."
+NOCURSOR=""
+[ "$CURSOR_TIMEOUT" -lt 0 ] && NOCURSOR="-nocursor" #No cursor if <0
+Xorg $NOCURSOR </dev/null &
+
+XSTARTUP=30
+for ((i=0; i<=XSTARTUP; i++)); do
+    if xset q >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+
+# Restore /dev/tty0
+if [ -n "$TTY0_DELETED" ]; then
+    if mknod -m 620 /dev/tty0 c 4 0; then
+        bashio::log.info "Restored /dev/tty0 successfully..."
+    else
+        bashio::log.error "Failed to restore /dev/tty0..."
+    fi
+fi
+
+if ! xset q >/dev/null 2>&1; then
+    bashio::log.error "Error: X server failed to start within $XSTARTUP seconds."
+    exit 1
+fi
+bashio::log.info "X server started successfully after $i seconds..."
+
+# List xinput devices
+echo "xinput list:"
+xinput list | sed 's/^/  /'
+
+#Stop console blinking cursor (this projects through the X-screen)
+echo -e "\033[?25l" > /dev/console
+
+#Hide cursor dynamically after CURSOR_TIMEOUT seconds if positive
+if [ "$CURSOR_TIMEOUT" -gt 0 ]; then
+    unclutter-xfixes --start-hidden --hide-on-touch --fork --timeout "$CURSOR_TIMEOUT"
+fi
+
+#### Start Window manager in the background
+WINMGR=Openbox #Openbox window manager
+openbox &
+
+#WINMGR=xfwm4  #Alternately using xfwm4
+#xfsettingsd &
+#startxfce4 &
+
+O_PID=$!
+sleep 0.5  #Ensure window manager starts
+if ! kill -0 "$O_PID" 2>/dev/null; then #Checks if process alive
+    bashio::log.error "Failed to start $WINMGR window  manager"
+    exit 1
+fi
+bashio::log.info "$WINMGR window manager started successfully..."
+
+#### Configure screen timeout (Note: DPMS needs to be enabled/disabled *after* starting window manager)
+xset +dpms #Turn on DPMS
+xset s "$SCREEN_TIMEOUT"
+xset dpms "$SCREEN_TIMEOUT" "$SCREEN_TIMEOUT" "$SCREEN_TIMEOUT"
+if [ "$SCREEN_TIMEOUT" -eq 0 ]; then
+    bashio::log.info "Screen timeout disabled..."
+else
+    bashio::log.info "Screen timeout after $SCREEN_TIMEOUT seconds..."
+fi
+
+#### Activate (+/- rotate) desired physical output number
+# Detect connected physical outputs
+
+readarray -t ALL_OUTPUTS < <(xrandr --query | awk '/^[[:space:]]*[A-Za-z0-9-]+/ {print $1}')
+bashio::log.info "All video outputs: ${ALL_OUTPUTS[*]}"
+
+readarray -t OUTPUTS < <(xrandr --query | awk '/ connected/ {print $1}') # Read in array of outputs
+if [ ${#OUTPUTS[@]} -eq 0 ]; then
+    bashio::log.info "ERROR: No connected outputs detected. Exiting.."
+    exit 1
+fi
+
+# Select the N'th connected output (fallback to last output if N exceeds actual number of outputs)
+if [ "$OUTPUT_NUMBER" -gt "${#OUTPUTS[@]}" ]; then
+    OUTPUT_NUMBER=${#OUTPUTS[@]}  # Use last output
+fi
+bashio::log.info "Connected video outputs: (Selected output marked with '*')"
+for i in "${!OUTPUTS[@]}"; do
+    marker=" "
+    [ "$i" -eq "$((OUTPUT_NUMBER - 1))" ] && marker="*"
+    bashio::log.info "  ${marker}[$((i + 1))] ${OUTPUTS[$i]}"
+done
+OUTPUT_NAME="${OUTPUTS[$((OUTPUT_NUMBER - 1))]}" #Subtract 1 since zero-based
+
+# Configure the selected output and disable others
+for OUTPUT in "${OUTPUTS[@]}"; do
+    if [ "$OUTPUT" = "$OUTPUT_NAME" ]; then #Activate
+        if [ "$ROTATE_DISPLAY" = normal ]; then
+            xrandr --output "$OUTPUT_NAME" --primary --auto
+        else
+            xrandr --output "$OUTPUT_NAME" --primary --rotate "${ROTATE_DISPLAY}"
+            bashio::log.info "Rotating $OUTPUT_NAME: ${ROTATE_DISPLAY}"
+        fi
+    else # Set as inactive output
+        xrandr --output "$OUTPUT" --off
+    fi
+done
+
+if [ "$MAP_TOUCH_INPUTS" = true ]; then #Map touch devices to physical output
+    while IFS= read -r id; do #Loop through all xinput devices
+        name=$(xinput list --name-only "$id" 2>/dev/null)
+        [[ "${name,,}" =~ (^|[^[:alnum:]_])(touch|touchscreen|stylus)([^[:alnum:]_]|$) ]] || continue #Not touch-like input
+        xinput_line=$(xinput list "$id" 2>/dev/null)
+        [[ "$xinput_line" =~ \[(slave|master)[[:space:]]+keyboard[[:space:]]+\([0-9]+\)\] ]] && continue
+        props="$(xinput list-props "$id" 2>/dev/null)"
+        [[ "$props" = *"Coordinate Transformation Matrix"* ]] ||  continue #No transformation matrix
+        xinput map-to-output "$id" "$OUTPUT_NAME" && RESULT="SUCCESS" || RESULT="FAILED"
+        bashio::log.info "Mapping: input device [$id|$name] -->  $OUTPUT_NAME [$RESULT]"
+
+    done < <(xinput list --id-only | sort -n)
+fi
+
+#### Set keyboard layout
+setxkbmap "$KEYBOARD_LAYOUT"
+export LANG=$KEYBOARD_LAYOUT
+bashio::log.info "Setting keyboard layout and language to: $KEYBOARD_LAYOUT"
+setxkbmap -query  | sed 's/^/  /' #Log layout
+
+### Get screen width & height for selected output
+read -r SCREEN_WIDTH SCREEN_HEIGHT < <(
+    xrandr --query --current | grep "^$OUTPUT_NAME " |
+    sed -n "s/^$OUTPUT_NAME connected.* \([0-9]\+\)x\([0-9]\+\)+.*$/\1 \2/p"
+)
+
+if [[ -n "$SCREEN_WIDTH" && -n "$SCREEN_HEIGHT" ]]; then
+    bashio::log.info "Screen: Width=$SCREEN_WIDTH  Height=$SCREEN_HEIGHT"
+else
+    bashio::log.error "Could not determine screen size for output $OUTPUT_NAME"
+fi
+
+#### Launch Onboard onscreen keyboard per configuration
+if [[ "$ONSCREEN_KEYBOARD" = true && -n "$SCREEN_WIDTH" && -n "$SCREEN_HEIGHT" ]]; then
+    ### Define min/max dimensions for orientation-agnostic calculation
+    if (( SCREEN_WIDTH >= SCREEN_HEIGHT )); then #Landscape
+        MAX_DIM=$SCREEN_WIDTH
+        MIN_DIM=$SCREEN_HEIGHT
+        ORIENTATION="landscape"
+    else #Portrait
+        MAX_DIM=$SCREEN_HEIGHT
+        MIN_DIM=$SCREEN_WIDTH
+        ORIENTATION="portrait"
+    fi
+
+    KBD_ASPECT_RATIO_X10=30  # Ratio of keyboard width to keyboard height times 10 (must be integer)
+    # So that 30 is 3:1 (Note use times 10 since want to use integer arithmetic)
+
+    ### Default keyboard geometry for landscape (full-width, bottom half of screen)
+    LAND_HEIGHT=$(( MIN_DIM / 3 ))
+    LAND_WIDTH=$(( (LAND_HEIGHT * KBD_ASPECT_RATIO_X10) / 10 ))
+    [ $LAND_WIDTH -gt "$MAX_DIM" ] && LAND_WIDTH=$MAX_DIM
+    LAND_Y_OFFSET=$(( MIN_DIM - LAND_HEIGHT ))
+    LAND_X_OFFSET=$(( (MAX_DIM - LAND_WIDTH) / 2 ))  # Centered
+
+    ### Default keyboard geometry for portrait (full-width, bottom 1/4 of screen)
+    PORT_HEIGHT=$(( MAX_DIM / 4 ))
+    PORT_WIDTH=$(( (PORT_HEIGHT * KBD_ASPECT_RATIO_X10) / 10 ))
+    [ $PORT_WIDTH -gt "$MIN_DIM" ] && PORT_WIDTH=$MIN_DIM
+    PORT_Y_OFFSET=$(( MAX_DIM - PORT_HEIGHT ))
+    PORT_X_OFFSET=$(( (MIN_DIM - PORT_WIDTH) / 2 ))  # Centered
+
+    ### Apply default settings and geometry
+    # Global appearance settings
+    dconf write /org/onboard/layout "'/usr/share/onboard/layouts/Small.onboard'"
+    dconf write /org/onboard/theme "'/usr/share/onboard/themes/Blackboard.theme'"
+    dconf write /org/onboard/theme-settings/color-scheme "'/usr/share/onboard/themes/Charcoal.colors'"
+
+    # Behavior settings
+    dconf write /org/onboard/auto-show/enabled true  # Auto-show
+    dconf write /org/onboard/auto-show/tablet-mode-detection-enabled false  # Show keyboard only in tablet mode
+    dconf write /org/onboard/window/force-to-top true  # Always on top
+    gsettings set org.gnome.desktop.interface toolkit-accessibility true  # Disable gnome accessibility popup
+
+    # Default landscape geometry
+    dconf write /org/onboard/window/landscape/height "$LAND_HEIGHT"
+    dconf write /org/onboard/window/landscape/width "$LAND_WIDTH"
+    dconf write /org/onboard/window/landscape/x "$LAND_X_OFFSET"
+    dconf write /org/onboard/window/landscape/y "$LAND_Y_OFFSET"
+
+    # Default portrait geometry
+    dconf write /org/onboard/window/portrait/height "$PORT_HEIGHT"
+    dconf write /org/onboard/window/portrait/width "$PORT_WIDTH"
+    dconf write /org/onboard/window/portrait/x "$PORT_X_OFFSET"
+    dconf write /org/onboard/window/portrait/y "$PORT_Y_OFFSET"
+
+    ### Restore or delete saved  user configuration
+    if [ -f "$ONBOARD_CONFIG_FILE" ]; then
+        if [ "$SAVE_ONSCREEN_CONFIG" = true ]; then
+            bashio::log.info "Restoring Onboard configuration from '$ONBOARD_CONFIG_FILE'"
+            dconf load /org/onboard/ < "$ONBOARD_CONFIG_FILE"
+        else #Otherwise delete config file (if it exists)
+            rm -f "$ONBOARD_CONFIG_FILE"
+        fi
+    fi
+
+    LOG_MSG=$(
+        echo "Onboard keyboard initialized for: $OUTPUT_NAME (${SCREEN_WIDTH}x${SCREEN_HEIGHT}) [$ORIENTATION]"
+        echo "  Appearance: Layout=$(dconf read /org/onboard/layout)  Theme=$(dconf read /org/onboard/theme)  Color-Scheme=$(dconf read /org/onboard/theme-settings/color-scheme)"
+        echo "  Behavior: Auto-Show=$(dconf read /org/onboard/auto-show/enabled)  Tablet-Mode=$(dconf read /org/onboard/auto-show/tablet-mode-detection-enabled)  Force-to-Top=$(dconf read /org/onboard/window/force-to-top)"
+        echo "  Geometry: Height=$(dconf read /org/onboard/window/${ORIENTATION}/height)  Width=$(dconf read /org/onboard/window/${ORIENTATION}/width)  X-Offset=$(dconf read /org/onboard/window/${ORIENTATION}/x)  Y-Offset=$(dconf read /org/onboard/window/${ORIENTATION}/y)"
+    )
+    bashio::log.info "$LOG_MSG"
+
+    ### Launch 'Onboard' keyboard
+    bashio::log.info "Starting Onboard onscreen keyboard"
+    onboard &
+    python3 /toggle_keyboard.py "$DARK_MODE" & #Creates 1x1 pixel at extreme top-right of screen to toggle keyboard visibility
+fi
+
+#### Start  HAOSKiosk REST server
+bashio::log.info "Starting HAOSKiosk REST server..."
+python3 /rest_server.py &
+
+#### Start browser (or debug mode)  and wait/sleep
+if [ "$DEBUG_MODE" != true ]; then
+    ### Run Luakit in the background and wait for process to exit
+    bashio::log.info "Launching Luakit browser: $HA_URL/$HA_DASHBOARD"
+    luakit "$HA_URL/$HA_DASHBOARD" &
+    LUAKIT_PID=$!
+    wait "$LUAKIT_PID" #Wait for luakit to exit to allow for clean-up on termination
+else ### Debug mode
+    bashio::log.info "Entering debug mode (X & $WINMGR window manager but no luakit browser)..."
+    exec sleep infinite
+fi
