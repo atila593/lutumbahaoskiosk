@@ -2,6 +2,7 @@ Section "ServerFlags"
     Option "DontVTSwitch" "true"
     Option "DontZap" "true"
     Option "AutoAddDevices" "false"
+    Option "NoConsole" "true"
 EndSection
 
 Section "ServerLayout"
