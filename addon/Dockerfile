@@ -94,4 +94,6 @@ RUN sed -i 's/\r$//' /run.sh && \
 # ------------------------------------------------------------------------------
 # Exécution - IMPORTANT: Utiliser la forme shell, pas exec form
 # ------------------------------------------------------------------------------
-CMD /run.sh
+RUN mkdir -p /etc/services.d/kiosk && \
+    mv /run.sh /etc/services.d/kiosk/run && \
+    chmod +x /etc/services.d/kiosk/run
