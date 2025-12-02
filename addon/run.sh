@@ -55,7 +55,6 @@ ha_info=$(bashio::info)
 bashio::log.info "Core=$(echo "$ha_info" | jq -r '.homeassistant')  HAOS=$(echo "$ha_info" | jq -r '.hassos')  MACHINE=$(echo "$ha_info" | jq -r '.machine')  ARCH=$(echo "$ha_info" | jq -r '.arch')"
 
 #### Clean up on exit:
-TTY0_DELETED="" #Need to set to empty string since runs with nounset=on (like set -u)
 ONBOARD_CONFIG_FILE="/config/onboard-settings.dconf"
 cleanup() {
     local exit_code=$?
@@ -63,7 +62,6 @@ cleanup() {
         dconf dump /org/onboard/ > "$ONBOARD_CONFIG_FILE"
     fi
     jobs -p | xargs -r kill
-    [ -n "$TTY0_DELETED" ] && mknod -m 620 /dev/tty0 c 4 0
     exit "$exit_code"
 }
 trap cleanup HUP INT QUIT ABRT TERM EXIT
@@ -163,23 +161,18 @@ echo "export DBUS_SESSION_BUS_ADDRESS='$DBUS_SESSION_BUS_ADDRESS'" >> "$HOME/.pr
 # Also, prevents udev permission error warnings & issues
 # Note that remounting rw is not sufficient
 
-# First, remount /dev as read-write since X absolutely, must have /dev/tty access
-# Note: need to use the version of 'mount' in util-linux, not busybox
-# Note: Do *not* later remount as 'ro' since that affect the root fs and
-#       in particular will block HAOS updates
+# In a Docker container with devices mapped, we don't need this hack
+# Just check if /dev/tty0 exists and try to work with it
 if [ -e "/dev/tty0" ]; then
-    bashio::log.info "Attempting to remount /dev as 'rw' so we can (temporarily) delete /dev/tty0..."
-    mount -o remount,rw /dev
-    if ! mount -o remount,rw /dev ; then
-        bashio::log.error "Failed to remount /dev as read-write..."
-        exit 1
+    bashio::log.info "/dev/tty0 exists, attempting to make it accessible..."
+    # Try to change permissions instead of deleting
+    if chmod 666 /dev/tty0 2>/dev/null; then
+        bashio::log.info "Changed /dev/tty0 permissions successfully..."
+    else
+        bashio::log.warning "Could not change /dev/tty0 permissions, continuing anyway..."
     fi
-    if  ! rm -f /dev/tty0 ; then
-        bashio::log.error "Failed to delete /dev/tty0..."
-        exit 1
-    fi
-    TTY0_DELETED=1
-    bashio::log.info "Deleted /dev/tty0 successfully..."
+else
+    bashio::log.info "/dev/tty0 does not exist, X will use alternative..."
 fi
 
 #### Start udev (used by X)
@@ -277,15 +270,6 @@ for ((i=0; i<=XSTARTUP; i++)); do
     fi
     sleep 1
 done
-
-# Restore /dev/tty0
-if [ -n "$TTY0_DELETED" ]; then
-    if mknod -m 620 /dev/tty0 c 4 0; then
-        bashio::log.info "Restored /dev/tty0 successfully..."
-    else
-        bashio::log.error "Failed to restore /dev/tty0..."
-    fi
-fi
 
 if ! xset q >/dev/null 2>&1; then
     bashio::log.error "Error: X server failed to start within $XSTARTUP seconds."
