@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bashio
 # shellcheck shell=bash
-VERSION="1.1.1"
+VERSION="1.0.6"
 ################################################################################
 #
 #  Code does the following:
