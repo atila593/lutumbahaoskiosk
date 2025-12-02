@@ -32,6 +32,8 @@ RUN \
             tk \
             jq \
             dbus-x11 \
+            libinput-tools \
+            udev \
             && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists/*; \
@@ -58,6 +60,8 @@ RUN \
             tk \
             jq \
             dbus \
+            libinput \
+            eudev \
             && \
         rm -rf /var/cache/apk/*; \
     fi
@@ -65,7 +69,6 @@ RUN \
 # ------------------------------------------------------------------------------
 # Environnement Virtuel Python (VENV)
 # ------------------------------------------------------------------------------
-# Ces étapes s'exécutent après l'installation des dépendances python3 et pip/py3-pip
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -75,25 +78,20 @@ RUN pip install --upgrade pip && \
 
 # ------------------------------------------------------------------------------
 # Copie des fichiers et Permissions
-# J'ai mis à jour les chemins pour correspondre à vos COPY précédents
 # ------------------------------------------------------------------------------
 COPY run.sh /run.sh
 COPY rest_server.py /rest_server.py
 COPY toggle_keyboard.py /toggle_keyboard.py
 COPY xorg.conf.default /etc/X11/xorg.conf.default
 
+# Nettoyage des fins de ligne Windows et attribution des permissions
 RUN sed -i 's/\r$//' /run.sh && \
     sed -i 's/\r$//' /rest_server.py && \
     sed -i 's/\r$//' /toggle_keyboard.py && \
-    chmod +x /run.sh /rest_server.py /toggle_keyboard.py 
-
-# IMPORTANT : Ajout de la permission pour le fichier de configuration Xorg
-RUN chmod 644 /etc/X11/xorg.conf.default
-
+    chmod a+x /run.sh && \
+    chmod 644 /etc/X11/xorg.conf.default
 
 # ------------------------------------------------------------------------------
-# Exécution
+# Exécution - IMPORTANT: Utiliser la forme shell, pas exec form
 # ------------------------------------------------------------------------------
-CMD ["/run.sh"]
-
-
+CMD /run.sh
