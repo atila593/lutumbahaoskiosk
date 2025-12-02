@@ -1,5 +1,5 @@
 name: "Firefox HAOS Kiosk"
-version: "1.0.5"
+version: "1.0.2"
 slug: "kiosk_firefox_final"
 description: "Firefox en mode Kiosk pour Home Assistant OS, avec auto-login et REST API."
 url: "https://github.com/atila593/lutumbahaoskiosk"
@@ -24,6 +24,7 @@ map:
 host_network: true
 host_dbus: true
 apparmor: false
+full_access: true
 
 # Accès aux périphériques nécessaires
 devices:
@@ -31,9 +32,13 @@ devices:
   - /dev/tty0:/dev/tty0:rwm
   - /dev/tty1:/dev/tty1:rwm
   - /dev/fb0:/dev/fb0:rwm
+  - /dev/console:/dev/console:rwm
 
 # Accès udev pour la détection des périphériques
 udev: true
+
+# Capacités kernel nécessaires pour X11
+kernel_modules: true
 
 # Exposition du port REST API
 ports:
