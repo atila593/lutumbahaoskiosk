@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bashio
 # shellcheck shell=bash
-VERSION="1.0.6"
+VERSION="1.1.1"
 ################################################################################
 #
 #  Code does the following:
@@ -262,8 +262,8 @@ echo "."
 bashio::log.info "Starting X on DISPLAY=$DISPLAY..."
 NOCURSOR=""
 [ "$CURSOR_TIMEOUT" -lt 0 ] && NOCURSOR="-nocursor" #No cursor if <0
-# Use -sharevts to avoid VT allocation issues in containers
-Xorg $NOCURSOR -sharevts </dev/null &
+# Use -novtswitch and don't specify a VT to avoid /dev/tty0 access
+Xorg $NOCURSOR -novtswitch -nolisten tcp </dev/null &
 
 XSTARTUP=30
 for ((i=0; i<=XSTARTUP; i++)); do
