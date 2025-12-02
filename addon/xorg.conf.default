@@ -29,7 +29,7 @@ EndSection
 Section "Device"
     Identifier "Card0"
     Driver "modesetting" # <-- Retour au driver modesetting
-    Option     		"kmsdev" "/dev/dri/card0" # On force l'utilisation du périphérique DRM
+    Option "kmsdev" "/dev/dri/card0" # On force l'utilisation du périphérique DRM
     # Supprimer les options AccelMethod et DRI
 EndSection
 
