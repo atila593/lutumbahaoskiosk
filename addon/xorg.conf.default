@@ -15,23 +15,20 @@ EndSection
 
 Section "InputDevice"
     Identifier "Mouse0"
-    Driver "libinput"  # Utiliser libinput à la place de evdev
-    Option "CorePointer" "true"  # S'assurer que CorePointer est déclaré
-    Option "SendEventsMode" "Disabled" # Peut aider à éviter les interférences
+    Driver "libinput"
+    Option "CorePointer" "true"
+    Option "SendEventsMode" "Disabled"
 EndSection
 
 Section "InputDevice"
     Identifier "Keyboard0"
     Driver "libinput"
-    Option "CoreKeyboard" "true"  # S'assurer que CoreKeyboard est déclaré
+    Option "CoreKeyboard" "true"
 EndSection
 
 Section "Device"
     Identifier "Card0"
-    Driver "modesetting"
-    Option "AccelMethod" "glamor"
-    Option "DRI" "3"
-    Option "kmsdev" "/dev/dri/card0"
+    Driver "fbdev"  # Nouveau pilote
 EndSection
 
 Section "Screen"
