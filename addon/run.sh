@@ -58,10 +58,11 @@ bashio::log.info "Core=$(echo "$ha_info" | jq -r '.homeassistant')  HAOS=$(echo 
 ONBOARD_CONFIG_FILE="/config/onboard-settings.dconf"
 cleanup() {
     local exit_code=$?
-    if [ "$SAVE_ONSCREEN_CONFIG" = true ]; then
-        dconf dump /org/onboard/ > "$ONBOARD_CONFIG_FILE"
+    # Only save onboard config if variable is set and true
+    if [ "${SAVE_ONSCREEN_CONFIG:-false}" = "true" ]; then
+        dconf dump /org/onboard/ > "$ONBOARD_CONFIG_FILE" 2>/dev/null || true
     fi
-    jobs -p | xargs -r kill
+    jobs -p | xargs -r kill 2>/dev/null || true
     exit "$exit_code"
 }
 trap cleanup HUP INT QUIT ABRT TERM EXIT
@@ -261,7 +262,8 @@ echo "."
 bashio::log.info "Starting X on DISPLAY=$DISPLAY..."
 NOCURSOR=""
 [ "$CURSOR_TIMEOUT" -lt 0 ] && NOCURSOR="-nocursor" #No cursor if <0
-Xorg $NOCURSOR </dev/null &
+# Use -sharevts to avoid VT allocation issues in containers
+Xorg $NOCURSOR -sharevts </dev/null &
 
 XSTARTUP=30
 for ((i=0; i<=XSTARTUP; i++)); do
