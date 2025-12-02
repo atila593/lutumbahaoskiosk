@@ -128,9 +128,6 @@ schema:
   allow_user_commands: bool
   debug_mode: bool
 
-# Image de l'add-on (optionnel)
-image: "ghcr.io/{arch}-addon-kiosk-firefox"
-
 # Icône pour l'interface HA (optionnel, utilise une icône par défaut sinon)
 # icon: mdi:monitor-dashboard
 
