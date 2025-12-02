@@ -28,8 +28,9 @@ EndSection
 
 Section "Device"
     Identifier "Card0"
-    Driver "fbdev"  # Nouveau pilote
-    Option "fbdev" "/dev/fb0"
+    Driver "intel"
+    Option "AccelMethod" "sna" # Accélération moderne
+    Option "DRI" "3"
 EndSection
 
 Section "Screen"
