@@ -1,5 +1,5 @@
 name: "Firefox HAOS Kiosk"
-version: "1.0.0"
+version: "1.0.2"
 slug: "kiosk_firefox_final"
 description: "Firefox en mode Kiosk pour Home Assistant OS, avec auto-login et REST API."
 url: "https://github.com/atila593/lutumbahaoskiosk"
@@ -7,69 +7,168 @@ arch:
   - amd64
   - aarch64
   - armv7
-build_from:
-  amd64: ghcr.io/home-assistant/amd64-base-debian:latest
-  aarch64: ghcr.io/home-assistant/aarch64-base-debian:latest
-  armv7: ghcr.io/home-assistant/armv7-base-debian:latest
 
+# Images de base pour chaque architecture
+build_from:
+  amd64: ghcr.io/home-assistant/amd64-base:latest
+  aarch64: ghcr.io/home-assistant/aarch64-base:latest
+  armv7: ghcr.io/home-assistant/armv7-base:latest
+
+# Montage des répertoires Home Assistant
 map:
   - config:rw
   - share:rw
   - media:rw
+
+# Permissions nécessaires pour X11 et le contrôle matériel
 host_network: true
 host_dbus: true
-ports:
-  8080/tcp: null
-ports_description:
-  8080/tcp: "Port REST API pour les commandes distantes (exec_js, refresh)"
+privileged: true
+apparmor: false
 
+# Exposition du port REST API
+ports:
+  8080/tcp: 8080
+
+ports_description:
+  8080/tcp: "Port REST API pour les commandes distantes (refresh, exec_js, screen_on/off)"
+
+# Variables d'environnement pour X11
+environment:
+  DISPLAY: ":0"
+
+# Options par défaut (à configurer par l'utilisateur)
 options:
+  # === Configuration Home Assistant (OBLIGATOIRE) ===
   ha_username: ""
   ha_password: ""
   ha_url: "http://homeassistant.local:8123"
   ha_dashboard: ""
+  
+  # === Configuration du navigateur ===
   login_delay: 1.0
   zoom_level: 100
   browser_refresh: 600
+  
+  # === Configuration de l'écran ===
   screen_timeout: 0
   output_number: 1
+  rotate_display: "normal"
+  
+  # === Apparence ===
   dark_mode: true
   ha_sidebar: false
-  rotate_display: "normal"
-  map_touch_inputs: false
   cursor_timeout: 5
+  
+  # === Périphériques d'entrée ===
+  map_touch_inputs: false
   keyboard_layout: "fr"
   onscreen_keyboard: false
   save_onscreen_config: true
+  
+  # === Configuration avancée Xorg ===
   xorg_conf: ""
   xorg_append_replace: "append"
+  
+  # === API REST ===
   rest_port: 8080
   rest_authorization_token: ""
+  
+  # === Débogage ===
   allow_user_commands: false
   debug_mode: false
 
+# Schéma de validation des options
 schema:
+  # Configuration Home Assistant
   ha_username: str
   ha_password: password
   ha_url: str
   ha_dashboard: str
-  login_delay: float
-  zoom_level: int
-  browser_refresh: int
-  screen_timeout: int
-  output_number: int
+  
+  # Configuration navigateur
+  login_delay: float(0.1,10.0)
+  zoom_level: int(50,200)
+  browser_refresh: int(0,86400)
+  
+  # Configuration écran
+  screen_timeout: int(0,86400)
+  output_number: int(1,10)
+  rotate_display: list(normal|left|right|inverted)
+  
+  # Apparence
   dark_mode: bool
   ha_sidebar: bool
-  rotate_display: list(normal|left|right|inverted)
+  cursor_timeout: int(-1,3600)
+  
+  # Périphériques
   map_touch_inputs: bool
-  cursor_timeout: int
   keyboard_layout: str
   onscreen_keyboard: bool
   save_onscreen_config: bool
+  
+  # Xorg avancé
   xorg_conf: str
   xorg_append_replace: list(append|replace)
-  rest_port: int
+  
+  # API REST
+  rest_port: port
   rest_authorization_token: str
+  
+  # Débogage
   allow_user_commands: bool
   debug_mode: bool
 
+# Image de l'add-on (optionnel)
+image: "ghcr.io/{arch}-addon-kiosk-firefox"
+
+# Icône pour l'interface HA (optionnel, utilise une icône par défaut sinon)
+# icon: mdi:monitor-dashboard
+
+# Page de documentation (optionnel)
+# documentation: https://github.com/atila593/lutumbahaoskiosk/blob/main/README.md
+
+# Changelog (optionnel)
+# changelog: https://github.com/atila593/lutumbahaoskiosk/releases
+
+# Démarrage automatique (optionnel, par défaut: false)
+startup: disabled
+
+# Type d'initialisation (optionnel)
+init: false
+
+# Panneau Ingress (optionnel, pour intégration dans l'interface HA)
+# ingress: true
+# ingress_port: 8080
+# panel_icon: mdi:monitor-dashboard
+# panel_title: Firefox Kiosk
+
+# Surveillance (watchdog)
+watchdog: "tcp://[HOST]:8080"
+
+# Audio (si besoin plus tard)
+# audio: true
+
+# Périphériques USB (si besoin de périphériques spécifiques)
+# devices:
+#   - /dev/dri
+#   - /dev/input
+
+# Contrôle GPIO (Raspberry Pi)
+# gpio: true
+
+# Accès complet au bus système
+# full_access: true
+
+# HomeKit (si nécessaire)
+# homekit: false
+
+# Options du kernel (avancé)
+# kernel_modules: true
+
+# Services requis (optionnel)
+# services:
+#   - mqtt:need
+
+# tmpfs (mémoire temporaire)
+tmpfs: true
