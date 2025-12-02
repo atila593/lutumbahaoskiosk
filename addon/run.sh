@@ -1,4 +1,4 @@
-!/usr/bin/with-contenv bashio
+#!/usr/bin/with-contenv bashio
 # shellcheck shell=bash
 VERSION="1.1.1"
 ################################################################################
