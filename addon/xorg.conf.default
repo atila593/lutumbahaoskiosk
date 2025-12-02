@@ -29,6 +29,7 @@ EndSection
 Section "Device"
     Identifier "Card0"
     Driver "fbdev"  # Nouveau pilote
+    Option "fbdev" "/dev/fb0"
 EndSection
 
 Section "Screen"
