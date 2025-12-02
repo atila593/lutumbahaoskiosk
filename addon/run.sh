@@ -78,7 +78,7 @@ load_config_var() {
     local DEFAULT="${2:-}"
     local MASK="${3:-}"
 
-    local VALUE
+    local VALUE=""
     #Check if $VAR_NAME exists before getting its value since 'set +x' mode
     if declare -p "$VAR_NAME" >/dev/null 2>&1; then #Variable exist, get its value
         VALUE="${!VAR_NAME}"
@@ -86,6 +86,7 @@ load_config_var() {
         VALUE="$(bashio::config "${VAR_NAME,,}")"
     else
         bashio::log.warning "Unknown config key: ${VAR_NAME,,}"
+        VALUE=""
     fi
 
     if [ "$VALUE" = "null" ] || [ -z "$VALUE" ]; then
@@ -126,7 +127,7 @@ load_config_var SAVE_ONSCREEN_CONFIG true
 load_config_var XORG_CONF ""
 load_config_var XORG_APPEND_REPLACE append
 load_config_var REST_PORT 8080
-load_config_var REST_BEARER_TOKEN "" 1 #Mask token in log
+load_config_var REST_AUTHORIZATION_TOKEN "" 1 #Mask token in log
 load_config_var ALLOW_USER_COMMANDS false
 [ "$ALLOW_USER_COMMANDS" = "true" ] && bashio::log.warning "WARNING: 'allow_user_commands' set to 'true'"
 load_config_var DEBUG_MODE false
