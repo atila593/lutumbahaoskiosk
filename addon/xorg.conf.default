@@ -1,6 +1,10 @@
-Section "ServerLayout"
-    Identifier "DefaultLayout"
-    Screen 0 "Screen0"
+Section "ServerFlags"
+    Option "DontVTSwitch" "true"
+    Option "ShareVT" "true"
+    Option "AutoEnableDevices" "true"
+    Option "AutoAddDevices" "true"
+    Option "AllowMouseOpenFail" "true"
+    Option "NoPM" "true"
 EndSection
 
 Section "Monitor"
@@ -20,10 +24,8 @@ Section "Screen"
     DefaultDepth 24
 EndSection
 
-# Generic libinput (Xorg auto-config does the rest)
 Section "InputClass"
     Identifier "libinput all"
     Driver "libinput"
     MatchDevicePath "/dev/input/event*"
 EndSection
-
