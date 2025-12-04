@@ -233,7 +233,10 @@ if [ -z "$selected_card" ]; then
 fi
 
 #### Start Xorg in the background
-rm -rf /tmp/.X*-lock #Cleanup old versions
+# Cleanup any old X11 locks from previous crashed instances
+rm -rf /tmp/.X*-lock /tmp/.X11-unix 2>/dev/null || true
+mkdir -p /tmp/.X11-unix
+chmod 1777 /tmp/.X11-unix
 
 # Modify 'xorg.conf' as appropriate
 if [[ -n "$XORG_CONF" && "${XORG_APPEND_REPLACE}" = "replace" ]]; then
