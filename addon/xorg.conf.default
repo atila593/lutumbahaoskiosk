@@ -1,9 +1,29 @@
+Section "ServerLayout"
+    Identifier "DefaultLayout"
+    Screen 0 "Screen0"
+EndSection
+
+Section "Monitor"
+    Identifier "Monitor0"
+EndSection
+
 Section "Device"
     Identifier "Card0"
     Driver "modesetting"
+    Option "DRI" "3"
 EndSection
 
 Section "Screen"
     Identifier "Screen0"
     Device "Card0"
+    Monitor "Monitor0"
+    DefaultDepth 24
 EndSection
+
+# Generic libinput (Xorg auto-config does the rest)
+Section "InputClass"
+    Identifier "libinput all"
+    Driver "libinput"
+    MatchDevicePath "/dev/input/event*"
+EndSection
+
