@@ -194,8 +194,16 @@ NOCURSOR=""
 Xorg $NOCURSOR -novtswitch -nolisten tcp </dev/null &
 
 XSTARTUP=30
+bashio::log.info "Waiting for X server to start (PID: $XORG_PID)..."
 for ((i=0; i<=XSTARTUP; i++)); do
-    if xset q >/dev/null 2>&1; then
+    # Vérifier d'abord que le processus X tourne toujours
+    if ! kill -0 "$XORG_PID" 2>/dev/null; then
+        bashio::log.error "X server process died unexpectedly!"
+        exit 1
+    fi
+    
+    # Vérifier si X répond
+    if DISPLAY=:0 xset q >/dev/null 2>&1; then
         break
     fi
     sleep 1
