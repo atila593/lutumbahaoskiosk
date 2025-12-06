@@ -186,7 +186,7 @@ NOCURSOR=""
 [ "$CURSOR_TIMEOUT" -lt 0 ] && NOCURSOR="-nocursor"
 
 # CORRECTION CRITIQUE : Capturer le PID de Xorg
-Xorg $NOCURSOR -novtswitch -nolisten tcp </dev/null &
+Xorg $NOCURSOR vt7 &
 XORG_PID=$!
 
 XSTARTUP=30
