@@ -211,6 +211,8 @@ if ! xset q >/dev/null 2>&1; then
 fi
 bashio::log.info "X server started successfully after $i seconds..."
 
+dmesg -n 1
+
 echo "xinput list:"
 xinput list | sed 's/^/  /'
 
