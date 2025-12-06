@@ -1,3 +1,0 @@
-# Répertoire xset.d
-
-Ce répertoire est inclus pour la compatibilité avec la structure de l'add-on HAOS Kiosk original. La logique réelle de gestion de l'écran X (xset/DPMS) est implémentée dans run.sh.
