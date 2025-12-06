@@ -1,0 +1,8 @@
+{
+  "name": "HAOS Lutumba Kiosk Repository",
+  "url": "https://github.com/atila593/lutumbahaoskiosk",
+  "maintainer": "atila593",
+  "addons": [
+    "addon"  
+  ]
+}
