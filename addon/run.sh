@@ -147,7 +147,7 @@ for status_path in /sys/class/drm/card[0-9]*-*/status; do
         selected_card="$card"
         printf "  *"
     else
-        printf "   "
+        printf "  "
     fi
     printf "%-25s%-20s%s\n" "$card_port" "$driver" "$status"
 done
@@ -166,7 +166,22 @@ if [[ -n "$XORG_CONF" && "${XORG_APPEND_REPLACE}" = "replace" ]]; then
     echo "${XORG_CONF}" >| /etc/X11/xorg.conf
 else
     cp -a /etc/X11/xorg.conf{.default,}
-    sed -i "/Option[[:space:]]\+\"DRI\"[[:space:]]\+\"3\"/a\    Option     \t\t\"kmsdev\" \"/dev/dri/$selected_card\"" /etc/X11/xorg.conf
+    
+    # ***************************************************************
+    # *********** FIX CRITIQUE: FORCER LE PILOTE INTEL **************
+    # ***************************************************************
+    # Si nous utilisons le fichier par défaut (XORG_CONF est vide), nous forçons le pilote 'intel'
+    # Ceci contourne le problème de cache de la configuration 'modesetting' par défaut.
+    if ! grep -q "Driver \"intel\"" /etc/X11/xorg.conf; then
+        bashio::log.info "Overriding default 'modesetting' with 'intel' driver for Intel i915 chip."
+        # Remplacer 'Driver "modesetting"' par 'Driver "intel"'
+        sed -i 's/Driver "modesetting"/Driver "intel"/' /etc/X11/xorg.conf
+        # Supprimer l'option AccelMethod "glamor" car elle peut être problématique avec 'intel'
+        sed -i '/Option "AccelMethod"/d' /etc/X11/xorg.conf
+    fi
+    # ***************************************************************
+    
+    sed -i "/Option[[:space:]]\+\"DRI\"[[:space:]]\+\"3\"/a\  Option        \t\t\"kmsdev\" \"/dev/dri/$selected_card\"" /etc/X11/xorg.conf
     if [ -z "$XORG_CONF" ]; then
         bashio::log.info "No user 'xorg.conf' data provided, using default..."
     elif [ "${XORG_APPEND_REPLACE}" = "append" ]; then
