@@ -1,0 +1,183 @@
+name: "Firefox HAOS Kiosk"
+version: "1.0.2"
+slug: "kiosk_firefox_final"
+description: "Firefox en mode Kiosk pour Home Assistant OS, avec auto-login et REST API."
+url: "https://github.com/atila593/lutumbahaoskiosk"
+arch:
+  - amd64
+  - aarch64
+  - armv7
+
+# Images de base pour chaque architecture
+build_from:
+  amd64: ghcr.io/home-assistant/amd64-base:latest
+  aarch64: ghcr.io/home-assistant/aarch64-base:latest
+  armv7: ghcr.io/home-assistant/armv7-base:latest
+
+# Montage des répertoires Home Assistant
+map:
+  - config:rw
+  - share:rw
+  - media:rw
+
+# Permissions nécessaires pour X11 et le contrôle matériel
+host_network: true
+host_dbus: true
+apparmor: false
+full_access: true
+privileged: true
+
+# Accès aux périphériques nécessaires
+devices:
+  - /dev/dri:/dev/dri:rwm
+  - /dev/tty0:/dev/tty0:rwm
+  - /dev/tty1:/dev/tty1:rwm
+  - /dev/fb0:/dev/fb0:rwm
+  - /dev/console:/dev/console:rwm
+
+# Accès udev pour la détection des périphériques
+udev: true
+
+# Capacités kernel nécessaires pour X11
+kernel_modules: true
+
+# Exposition du port REST API
+ports:
+  8080/tcp: 8080
+
+ports_description:
+  8080/tcp: "Port REST API pour les commandes distantes (refresh, exec_js, screen_on/off)"
+
+# Variables d'environnement pour X11
+environment:
+  DISPLAY: ":0"
+
+# Options par défaut (à configurer par l'utilisateur)
+options:
+  # === Configuration Home Assistant (OBLIGATOIRE) ===
+  ha_username: ""
+  ha_password: ""
+  ha_url: "http://homeassistant.local:8123"
+  ha_dashboard: ""
+  
+  # === Configuration du navigateur ===
+  login_delay: 1.0
+  zoom_level: 100
+  browser_refresh: 600
+  
+  # === Configuration de l'écran ===
+  screen_timeout: 0
+  output_number: 1
+  rotate_display: "normal"
+  
+  # === Apparence ===
+  dark_mode: true
+  ha_sidebar: false
+  cursor_timeout: 5
+  
+  # === Périphériques d'entrée ===
+  map_touch_inputs: false
+  keyboard_layout: "fr"
+  onscreen_keyboard: false
+  save_onscreen_config: true
+  
+  # === Configuration avancée Xorg ===
+  xorg_conf: ""
+  xorg_append_replace: "append"
+  
+  # === API REST ===
+  rest_port: 8080
+  rest_authorization_token: ""
+  
+  # === Débogage ===
+  allow_user_commands: false
+  debug_mode: false
+
+# Schéma de validation des options
+schema:
+  # Configuration Home Assistant
+  ha_username: str
+  ha_password: password
+  ha_url: str
+  ha_dashboard: str
+  
+  # Configuration navigateur
+  login_delay: float(0.1,10.0)
+  zoom_level: int(50,200)
+  browser_refresh: int(0,86400)
+  
+  # Configuration écran
+  screen_timeout: int(0,86400)
+  output_number: int(1,10)
+  rotate_display: list(normal|left|right|inverted)
+  
+  # Apparence
+  dark_mode: bool
+  ha_sidebar: bool
+  cursor_timeout: int
+  
+  # Périphériques
+  map_touch_inputs: bool
+  keyboard_layout: str
+  onscreen_keyboard: bool
+  save_onscreen_config: bool
+  
+  # Xorg avancé
+  xorg_conf: str
+  xorg_append_replace: list(append|replace)
+  
+  # API REST
+  rest_port: port
+  rest_authorization_token: str
+  
+  # Débogage
+  allow_user_commands: bool
+  debug_mode: bool
+
+# Icône pour l'interface HA (optionnel, utilise une icône par défaut sinon)
+# icon: mdi:monitor-dashboard
+
+# Page de documentation (optionnel)
+# documentation: https://github.com/atila593/lutumbahaoskiosk/blob/main/README.md
+
+# Changelog (optionnel)
+# changelog: https://github.com/atila593/lutumbahaoskiosk/releases
+
+# Type d'initialisation (optionnel)
+init: false
+
+# Panneau Ingress (optionnel, pour intégration dans l'interface HA)
+# ingress: true
+# ingress_port: 8080
+# panel_icon: mdi:monitor-dashboard
+# panel_title: Firefox Kiosk
+
+# Surveillance (watchdog)
+watchdog: "tcp://[HOST]:8080"
+
+# Audio (si besoin plus tard)
+# audio: true
+
+# Périphériques USB (si besoin de périphériques spécifiques)
+# devices:
+#   - /dev/dri
+#   - /dev/input
+
+# Contrôle GPIO (Raspberry Pi)
+# gpio: true
+
+# Accès complet au bus système
+# full_access: true
+
+# HomeKit (si nécessaire)
+# homekit: false
+
+# Options du kernel (avancé)
+# kernel_modules: true
+
+# Services requis (optionnel)
+# services:
+#   - mqtt:need
+
+# tmpfs (mémoire temporaire)
+tmpfs: true
