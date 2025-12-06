@@ -5,6 +5,7 @@ Section "ServerFlags"
     Option "AutoAddDevices" "true"
     Option "AllowMouseOpenFail" "true"
     Option "NoPM" "true"
+    Option "AllowEmptyInitialConfiguration" "true"
 EndSection
 
 Section "Monitor"
