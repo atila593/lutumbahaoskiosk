@@ -6,6 +6,9 @@ Section "ServerFlags"
     Option "AllowMouseOpenFail" "true"
     Option "NoPM" "true"
     Option "AllowEmptyInitialConfiguration" "true"
+    Option "IgnoreABI" "true"
+    Option "AllowInitFallback" "on"
+    Option "vtinit" "1"
 EndSection
 
 Section "Monitor"
@@ -18,6 +21,7 @@ Section "Device"
     Driver "modesetting"
     Option "DRI" "3"
     Option "kmsdev" "/dev/dri/card0"
+    Option "SWcursor" "true"
 EndSection
 
 Section "Screen"
@@ -36,4 +40,5 @@ Section "InputClass"
     Driver "libinput"
     MatchDevicePath "/dev/input/event*"
 EndSection
+
 
