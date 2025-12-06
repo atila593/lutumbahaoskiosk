@@ -34,6 +34,7 @@ RUN \
             dbus-x11 \
             libinput-tools \
             udev \
+            xserver-xorg-video-intel \
             && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists/*; \
@@ -62,12 +63,13 @@ RUN \
             dbus \
             libinput \
             eudev \
+            xf86-video-intel \
             && \
         rm -rf /var/cache/apk/*; \
     fi
 
 # ------------------------------------------------------------------------------
-# Environnement Virtuel Python (VENV)
+# Le reste du Dockerfile est inchangé
 # ------------------------------------------------------------------------------
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
