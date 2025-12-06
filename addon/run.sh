@@ -188,8 +188,15 @@ NOCURSOR=""
 # CORRECTION CRITIQUE : Capturer le PID de Xorg
 Xorg $NOCURSOR vt7 &
 XORG_PID=$!
+bashio::log.info "Xorg process started, checking if it stays alive..."
+sleep 2
+if ! kill -0 "$XORG_PID" 2>/dev/null; then
+    bashio::log.error "Xorg process died immediately! Last 50 lines of log:"
+    tail -50 /var/log/Xorg.0.log 2>/dev/null | sed 's/^/  /'
+    exit 1
+fi
 
-XSTARTUP=30
+XSTARTUP=10
 bashio::log.info "Waiting for X server to start (PID: $XORG_PID)..."
 for ((i=0; i<=XSTARTUP; i++)); do
     # Vérifier d'abord que le processus X tourne toujours
