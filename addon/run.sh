@@ -113,23 +113,23 @@ else
     bashio::log.info "/dev/tty0 does not exist, X will use alternative..."
 fi
 
-#### Start udev
-bashio::log.info "Starting 'udevd' and (re-)triggering..."
-if ! udevd --daemon || ! udevadm trigger; then
+# #### Start udev
+# bashio::log.info "Starting 'udevd' and (re-)triggering..."
+# if ! udevd --daemon || ! udevadm trigger; then
     bashio::log.warning "WARNING: Failed to start udevd or trigger udev, input devices may not work"
-fi
+# fi
 
-echo "/dev/input event devices:"
-for dev in $(find /dev/input/event* 2>/dev/null | sort -V); do
-    devpath_output=$(udevadm info --query=path --name="$dev" 2>/dev/null; echo -n $?)
-    return_status=${devpath_output##*$'\n'}
-    [ "$return_status" -eq 0 ] || { echo "  $dev: Failed to get device path"; continue; }
-    devpath=${devpath_output%$'\n'*}
-    echo "  $dev: $devpath"
-    udevadm test "$devpath" >/dev/null 2>&1 || echo "$dev: No valid udev rule found..."
-done
+# echo "/dev/input event devices:"
+# for dev in $(find /dev/input/event* 2>/dev/null | sort -V); do
+    # devpath_output=$(udevadm info --query=path --name="$dev" 2>/dev/null; echo -n $?)
+    # return_status=${devpath_output##*$'\n'}
+    # [ "$return_status" -eq 0 ] || { echo "  $dev: Failed to get device path"; continue; }
+    # devpath=${devpath_output%$'\n'*}
+    # echo "  $dev: $devpath"
+    # udevadm test "$devpath" >/dev/null 2>&1 || echo "$dev: No valid udev rule found..."
+# done
 
-udevadm settle --timeout=10
+# udevadm settle --timeout=10
 
 echo "libinput list-devices found:"
 libinput list-devices 2>/dev/null | awk '
