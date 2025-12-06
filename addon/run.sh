@@ -1,12 +1,8 @@
 #!/usr/bin/with-contenv bashio
 # shellcheck shell=bash
-VERSION="1.2.0-firefox"
+VERSION="1.2.1-firefox-fixed"
 ################################################################################
-# MODIFIÉ POUR FIREFOX - Version 1.2.0
-# Changements principaux:
-# - Remplacé Luakit par Firefox en mode kiosk
-# - Ajouté auto-login via JavaScript injection
-# - Support complet des caméras et streaming
+# VERSION CORRIGÉE - Résolution du bug XORG_PID
 ################################################################################
 
 echo "."
@@ -113,23 +109,20 @@ else
     bashio::log.info "/dev/tty0 does not exist, X will use alternative..."
 fi
 
-# #### Start udev
-# bashio::log.info "Starting 'udevd' and (re-)triggering..."
-# if ! udevd --daemon || ! udevadm trigger; then
+#### Start udev
+bashio::log.info "Starting 'udevd' and (re-)triggering..."
+if ! udevd --daemon || ! udevadm trigger; then
     bashio::log.warning "WARNING: Failed to start udevd or trigger udev, input devices may not work"
-# fi
+fi
 
-# echo "/dev/input event devices:"
-# for dev in $(find /dev/input/event* 2>/dev/null | sort -V); do
-    # devpath_output=$(udevadm info --query=path --name="$dev" 2>/dev/null; echo -n $?)
-    # return_status=${devpath_output##*$'\n'}
-    # [ "$return_status" -eq 0 ] || { echo "  $dev: Failed to get device path"; continue; }
-    # devpath=${devpath_output%$'\n'*}
-    # echo "  $dev: $devpath"
-    # udevadm test "$devpath" >/dev/null 2>&1 || echo "$dev: No valid udev rule found..."
-# done
-
-# udevadm settle --timeout=10
+echo "/dev/input event devices:"
+for dev in $(find /dev/input/event* 2>/dev/null | sort -V); do
+    devpath_output=$(udevadm info --query=path --name="$dev" 2>/dev/null; echo -n $?)
+    return_status=${devpath_output##*$'\n'}
+    [ "$return_status" -eq 0 ] || { echo "  $dev: Failed to get device path"; continue; }
+    devpath=${devpath_output%$'\n'*}
+    echo "  $dev: $devpath"
+done
 
 echo "libinput list-devices found:"
 libinput list-devices 2>/dev/null | awk '
@@ -159,7 +152,7 @@ for status_path in /sys/class/drm/card[0-9]*-*/status; do
     printf "%-25s%-20s%s\n" "$card_port" "$driver" "$status"
 done
 if [ -z "$selected_card" ]; then
-    bashio::log.info "ERROR: No connected video card detected. Exiting.."
+    bashio::log.error "ERROR: No connected video card detected. Exiting.."
     exit 1
 fi
 
@@ -191,7 +184,10 @@ echo "."
 bashio::log.info "Starting X on DISPLAY=$DISPLAY..."
 NOCURSOR=""
 [ "$CURSOR_TIMEOUT" -lt 0 ] && NOCURSOR="-nocursor"
+
+# CORRECTION CRITIQUE : Capturer le PID de Xorg
 Xorg $NOCURSOR -novtswitch -nolisten tcp </dev/null &
+XORG_PID=$!
 
 XSTARTUP=30
 bashio::log.info "Waiting for X server to start (PID: $XORG_PID)..."
@@ -252,7 +248,7 @@ bashio::log.info "All video outputs: ${ALL_OUTPUTS[*]}"
 
 readarray -t OUTPUTS < <(xrandr --query | awk '/ connected/ {print $1}')
 if [ ${#OUTPUTS[@]} -eq 0 ]; then
-    bashio::log.info "ERROR: No connected outputs detected. Exiting.."
+    bashio::log.error "ERROR: No connected outputs detected. Exiting.."
     exit 1
 fi
 
@@ -311,7 +307,7 @@ else
     bashio::log.error "Could not determine screen size for output $OUTPUT_NAME"
 fi
 
-#### Onboard keyboard (configuration identique à l'original)
+#### Onboard keyboard
 if [[ "$ONSCREEN_KEYBOARD" = true && -n "$SCREEN_WIDTH" && -n "$SCREEN_HEIGHT" ]]; then
     if (( SCREEN_WIDTH >= SCREEN_HEIGHT )); then
         MAX_DIM=$SCREEN_WIDTH
@@ -370,14 +366,19 @@ fi
 #### Start REST server
 bashio::log.info "Starting HAOSKiosk REST server..."
 python3 /rest_server.py &
+REST_PID=$!
+bashio::log.info "REST server started with PID: $REST_PID"
 
 ################################################################################
-#### FIREFOX LAUNCH - PARTIE MODIFIÉE
+#### FIREFOX LAUNCH
 ################################################################################
 if [ "$DEBUG_MODE" != true ]; then
     # Créer un profil Firefox temporaire
     FIREFOX_PROFILE="/tmp/firefox-kiosk-profile"
+    rm -rf "$FIREFOX_PROFILE" 2>/dev/null
     mkdir -p "$FIREFOX_PROFILE"
+    
+    bashio::log.info "Creating Firefox profile at: $FIREFOX_PROFILE"
     
     # Configurer Firefox pour le kiosk
     cat > "$FIREFOX_PROFILE/user.js" << EOF
@@ -396,57 +397,132 @@ user_pref("devtools.chrome.enabled", true);
 user_pref("devtools.debugger.prompt-connection", false);
 user_pref("privacy.donottrackheader.enabled", true);
 user_pref("geo.enabled", false);
+user_pref("general.warnOnAboutConfig", false);
+user_pref("browser.tabs.warnOnCloseOtherTabs", false);
+user_pref("browser.link.open_newwindow", 1);
+user_pref("browser.link.open_newwindow.restriction", 0);
 EOF
 
-    # Lancer Firefox en mode kiosk
-    bashio::log.info "Launching Firefox browser: ${HA_URL}/${HA_DASHBOARD}"
+    bashio::log.info "Firefox profile configuration created"
     
-    firefox \
+    # Vérifier que Firefox est disponible
+    if ! command -v firefox >/dev/null 2>&1; then
+        bashio::log.error "ERROR: Firefox command not found!"
+        exit 1
+    fi
+    
+    bashio::log.info "Firefox binary found at: $(which firefox)"
+    
+    # Attendre que X soit vraiment prêt
+    bashio::log.info "Waiting for X server to be fully ready..."
+    sleep 2
+    
+    # URL complète
+    FULL_URL="${HA_URL}/${HA_DASHBOARD}"
+    bashio::log.info "Launching Firefox in kiosk mode..."
+    bashio::log.info "Target URL: $FULL_URL"
+    
+    # Créer un fichier de log pour Firefox
+    FIREFOX_LOG="/tmp/firefox-kiosk.log"
+    
+    # Lancer Firefox avec logs détaillés
+    DISPLAY=:0 firefox \
         --kiosk \
         --new-instance \
         --profile "$FIREFOX_PROFILE" \
-        "${HA_URL}/${HA_DASHBOARD}" &
+        "$FULL_URL" \
+        > "$FIREFOX_LOG" 2>&1 &
     
     FIREFOX_PID=$!
+    bashio::log.info "Firefox launched with PID: $FIREFOX_PID"
     
-    # Auto-login avec xdotool après délai
+    # Attendre un peu et vérifier que Firefox tourne
+    sleep 3
+    
+    if ! kill -0 "$FIREFOX_PID" 2>/dev/null; then
+        bashio::log.error "ERROR: Firefox process died immediately!"
+        bashio::log.error "Firefox log output:"
+        cat "$FIREFOX_LOG" 2>/dev/null | sed 's/^/  /' || echo "  (no log file)"
+        exit 1
+    fi
+    
+    bashio::log.info "Firefox is running (PID: $FIREFOX_PID)"
+    
+    # Vérifier que la fenêtre est apparue
+    bashio::log.info "Checking for Firefox window..."
+    WAIT_WINDOW=10
+    WINDOW_FOUND=false
+    
+    for ((i=0; i<WAIT_WINDOW; i++)); do
+        if xdotool search --name "Firefox" >/dev/null 2>&1; then
+            WINDOW_FOUND=true
+            WINDOW_COUNT=$(xdotool search --name "Firefox" 2>/dev/null | wc -l)
+            bashio::log.info "✓ Firefox window detected! ($WINDOW_COUNT window(s))"
+            break
+        fi
+        sleep 1
+    done
+    
+    if [ "$WINDOW_FOUND" = false ]; then
+        bashio::log.warning "WARNING: Firefox window not detected after ${WAIT_WINDOW}s"
+        bashio::log.warning "But process is still running, continuing..."
+    fi
+    
+    # Auto-login avec xdotool
     bashio::log.info "Waiting ${LOGIN_DELAY}s before attempting auto-login..."
     sleep "$LOGIN_DELAY"
     
     # Script d'auto-login
     (
-        sleep 3
+        sleep 2
         bashio::log.info "Attempting Firefox auto-login..."
         
         # Chercher la fenêtre Firefox
-        WINDOW_ID=$(xdotool search --name "Firefox" | head -1)
+        WINDOW_ID=$(xdotool search --name "Firefox" 2>/dev/null | head -1)
         
         if [ -n "$WINDOW_ID" ]; then
-            xdotool windowactivate "$WINDOW_ID"
+            bashio::log.info "Found Firefox window: $WINDOW_ID"
+            
+            # Activer la fenêtre
+            xdotool windowactivate --sync "$WINDOW_ID"
             sleep 1
             
-            # Taper username
+            # S'assurer que la fenêtre est en focus
+            xdotool windowfocus "$WINDOW_ID"
+            sleep 0.5
+            
+            bashio::log.info "Typing username..."
             xdotool type --delay 100 "$HA_USERNAME"
             xdotool key Tab
             sleep 0.5
             
-            # Taper password
+            bashio::log.info "Typing password..."
             xdotool type --delay 100 "$HA_PASSWORD"
             sleep 0.5
             
-            # Valider
+            bashio::log.info "Submitting login form..."
             xdotool key Return
             
-            bashio::log.info "Auto-login sequence completed"
+            sleep 2
+            bashio::log.info "✓ Auto-login sequence completed"
         else
             bashio::log.warning "Could not find Firefox window for auto-login"
         fi
     ) &
     
-    # Attendre que Firefox se termine
-    wait "$FIREFOX_PID"
+    # Monitoring du processus Firefox
+    bashio::log.info "Monitoring Firefox process..."
+    while kill -0 "$FIREFOX_PID" 2>/dev/null; do
+        sleep 30
+    done
+    
+    bashio::log.error "Firefox process terminated unexpectedly!"
+    exit 1
+    
 else
     ### Debug mode
-    bashio::log.info "Entering debug mode (X & $WINMGR window manager but no browser)..."
+    bashio::log.info "==================================="
+    bashio::log.info "DEBUG MODE ACTIVATED"
+    bashio::log.info "==================================="
     exec sleep infinite
 fi
