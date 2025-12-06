@@ -9,12 +9,14 @@ EndSection
 
 Section "Monitor"
     Identifier "Monitor0"
+    Option "PreferredMode" "1920x1080"
 EndSection
 
 Section "Device"
     Identifier "Card0"
     Driver "modesetting"
     Option "DRI" "3"
+    Option "kmsdev" "/dev/dri/card0"
 EndSection
 
 Section "Screen"
@@ -25,6 +27,7 @@ Section "Screen"
     SubSection "Display"
         Depth 24
         Modes "1920x1080" "1280x720"
+    EndSubSection
 EndSection
 
 Section "InputClass"
@@ -32,3 +35,4 @@ Section "InputClass"
     Driver "libinput"
     MatchDevicePath "/dev/input/event*"
 EndSection
+
