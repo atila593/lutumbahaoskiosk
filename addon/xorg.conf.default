@@ -1,44 +1,45 @@
 Section "ServerFlags"
-    Option "DontVTSwitch" "true"
-    Option "ShareVT" "true"
-    Option "AutoEnableDevices" "true"
     Option "AutoAddDevices" "true"
+    Option "AutoEnableDevices" "true"
     Option "AllowMouseOpenFail" "true"
-    Option "NoPM" "true"
-    Option "AllowEmptyInitialConfiguration" "true"
-    Option "IgnoreABI" "true"
-    Option "AllowInitFallback" "on"
-    Option "vtinit" "1"
 EndSection
 
 Section "Monitor"
     Identifier "Monitor0"
-    Option "PreferredMode" "1920x1080"
 EndSection
 
 Section "Device"
     Identifier "Card0"
     Driver "modesetting"
-    Option "DRI" "3"
-    Option "kmsdev" "/dev/dri/card0"
-    Option "SWcursor" "true"
+    Option "AccelMethod" "glamor"
 EndSection
 
 Section "Screen"
     Identifier "Screen0"
     Device "Card0"
     Monitor "Monitor0"
-    DefaultDepth 24
-    SubSection "Display"
-        Depth 24
-        Modes "1920x1080" "1280x720"
-    EndSubSection
 EndSection
 
 Section "InputClass"
-    Identifier "libinput all"
+    Identifier "libinput keyboard catchall"
+    MatchIsKeyboard "on"
     Driver "libinput"
-    MatchDevicePath "/dev/input/event*"
 EndSection
 
+Section "InputClass"
+    Identifier "libinput pointer catchall"
+    MatchIsPointer "on"
+    Driver "libinput"
+EndSection
 
+Section "InputClass"
+    Identifier "libinput touchpad catchall"
+    MatchIsTouchpad "on"
+    Driver "libinput"
+EndSection
+
+Section "InputClass"
+    Identifier "libinput touchscreen catchall"
+    MatchIsTouchscreen "on"
+    Driver "libinput"
+EndSection
