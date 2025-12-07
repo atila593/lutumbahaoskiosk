@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bashio
 # shellcheck shell=bash
-VERSION="1.2.1-firefox-fixed"
+VERSION="1.2.2-firefox-fixed"
 
 echo "."
 printf '%*s\n' 80 '' | tr ' ' '#'
@@ -99,7 +99,7 @@ fi
 # ------------------- HANDLE /dev/tty0 -------------------
 if [ -e "/dev/tty0" ]; then
     bashio::log.info "/dev/tty0 exists, attempting to make it accessible..."
-    chmod 666 /dev/tty0 2>/dev/null || true
+    chmod 666 /dev/tty0 2>/dev/null || bashio::log.warning "Could not change /dev/tty0 permissions"
 fi
 
 # ------------------- START UDEV -------------------
@@ -133,80 +133,225 @@ fi
 
 # ------------------- XORG CONFIG -------------------
 rm -rf /tmp/.X*-lock /tmp/.X11-unix 2>/dev/null || true
-mkdir -p /tmp/.X11-unix
+mkdir -p /tmp/.X11-unix /etc/X11
 chmod 1777 /tmp/.X11-unix
 
+# Créer un xorg.conf minimal si aucun n'existe
+if [ ! -f /etc/X11/xorg.conf.default ]; then
+    bashio::log.warning "/etc/X11/xorg.conf.default not found, creating minimal config"
+    cat > /etc/X11/xorg.conf.default << 'EOFXORG'
+Section "ServerLayout"
+    Identifier     "Layout0"
+    Screen      0  "Screen0"
+EndSection
+
+Section "Device"
+    Identifier     "Card0"
+    Driver         "intel"
+    Option         "DRI" "3"
+EndSection
+
+Section "Screen"
+    Identifier     "Screen0"
+    Device         "Card0"
+EndSection
+
+Section "ServerFlags"
+    Option "AutoAddDevices" "true"
+    Option "AllowEmptyInput" "true"
+EndSection
+EOFXORG
+fi
+
+# Utiliser ou créer xorg.conf
 if [[ -n "$XORG_CONF" && "${XORG_APPEND_REPLACE}" = "replace" ]]; then
-    bashio::log.info "Replacing default 'xorg.conf'..."
-    echo "${XORG_CONF}" >| /etc/X11/xorg.conf
+    bashio::log.info "Replacing default 'xorg.conf' with user config..."
+    echo "${XORG_CONF}" > /etc/X11/xorg.conf
 else
-    if [ -f /etc/X11/xorg.conf.default ]; then
-        cp -a /etc/X11/xorg.conf{.default,}
-    else
-        bashio::log.warning "/etc/X11/xorg.conf.default not found, creating empty xorg.conf"
-        touch /etc/X11/xorg.conf
+    # Copier le fichier par défaut
+    cp -a /etc/X11/xorg.conf.default /etc/X11/xorg.conf
+    
+    # Forcer le pilote intel pour i915
+    if ! grep -q "Driver \"intel\"" /etc/X11/xorg.conf 2>/dev/null; then
+        bashio::log.info "Setting intel driver for i915 chip..."
+        sed -i 's/Driver "modesetting"/Driver "intel"/' /etc/X11/xorg.conf 2>/dev/null || true
+        sed -i '/Option "AccelMethod"/d' /etc/X11/xorg.conf 2>/dev/null || true
     fi
-
-    # FORCE INTEL DRIVER
-    if ! grep -q "Driver \"intel\"" /etc/X11/xorg.conf; then
-        bashio::log.info "Overriding default 'modesetting' with 'intel' driver for Intel i915 chip."
-        sed -i 's/Driver "modesetting"/Driver "intel"/' /etc/X11/xorg.conf
-        sed -i '/Option "AccelMethod"/d' /etc/X11/xorg.conf
+    
+    # Ajouter le kmsdev
+    if grep -q "Option.*DRI.*3" /etc/X11/xorg.conf 2>/dev/null; then
+        sed -i "/Option[[:space:]]\+\"DRI\"[[:space:]]\+\"3\"/a\  Option        \t\t\"kmsdev\" \"/dev/dri/$selected_card\"" /etc/X11/xorg.conf
     fi
-
-    sed -i "/Option[[:space:]]\+\"DRI\"[[:space:]]\+\"3\"/a\  Option        \t\t\"kmsdev\" \"/dev/dri/$selected_card\"" /etc/X11/xorg.conf
+    
+    # Ajouter la config utilisateur si présente
     if [ -n "$XORG_CONF" ] && [ "${XORG_APPEND_REPLACE}" = "append" ]; then
         bashio::log.info "Appending user 'xorg.conf'..."
-        echo -e "\n#\n${XORG_CONF}" >> /etc/X11/xorg.conf
+        echo -e "\n# User Configuration\n${XORG_CONF}" >> /etc/X11/xorg.conf
     fi
 fi
 
+bashio::log.info "Final xorg.conf:"
+cat /etc/X11/xorg.conf | sed 's/^/  /'
+
 # ------------------- START XORG -------------------
-bashio::log.info "Starting X on DISPLAY=:0..."
+export DISPLAY=:0
+bashio::log.info "Starting X server on DISPLAY=$DISPLAY..."
+
 NOCURSOR=""
 [ "$CURSOR_TIMEOUT" -lt 0 ] && NOCURSOR="-nocursor"
 
-Xorg $NOCURSOR &
+# Lancer Xorg en arrière-plan
+Xorg $NOCURSOR vt7 > /var/log/Xorg-startup.log 2>&1 &
 XORG_PID=$!
-sleep 2
-if ! kill -0 "$XORG_PID" 2>/dev/null; then
-    bashio::log.error "Xorg process died immediately! Last 50 lines of /var/log/Xorg.0.log:"
-    tail -50 /var/log/Xorg.0.log 2>/dev/null | sed 's/^/  /'
+bashio::log.info "Xorg launched with PID: $XORG_PID"
+
+# Attendre que X démarre
+XSTARTUP=15
+bashio::log.info "Waiting for X server to be ready..."
+for ((i=1; i<=XSTARTUP; i++)); do
+    # Vérifier que le processus tourne
+    if ! kill -0 "$XORG_PID" 2>/dev/null; then
+        bashio::log.error "ERROR: Xorg process died! Logs:"
+        tail -50 /var/log/Xorg.0.log 2>/dev/null | sed 's/^/  /'
+        tail -20 /var/log/Xorg-startup.log 2>/dev/null | sed 's/^/  /'
+        exit 1
+    fi
+    
+    # Vérifier si X répond
+    if xset q >/dev/null 2>&1; then
+        bashio::log.info "✓ X server ready after $i seconds"
+        break
+    fi
+    
+    if [ $i -eq $XSTARTUP ]; then
+        bashio::log.error "ERROR: X server timeout after ${XSTARTUP}s"
+        exit 1
+    fi
+    sleep 1
+done
+
+# ------------------- WINDOW MANAGER -------------------
+bashio::log.info "Starting Openbox window manager..."
+openbox &
+OPENBOX_PID=$!
+sleep 1
+if ! kill -0 "$OPENBOX_PID" 2>/dev/null; then
+    bashio::log.warning "WARNING: Openbox failed to start, continuing anyway..."
+else
+    bashio::log.info "✓ Openbox started (PID: $OPENBOX_PID)"
+fi
+
+# ------------------- SCREEN CONFIG -------------------
+xset +dpms
+xset s "$SCREEN_TIMEOUT"
+xset dpms "$SCREEN_TIMEOUT" "$SCREEN_TIMEOUT" "$SCREEN_TIMEOUT"
+bashio::log.info "Screen timeout: ${SCREEN_TIMEOUT}s"
+
+# Configure outputs
+readarray -t OUTPUTS < <(xrandr --query | awk '/ connected/ {print $1}')
+if [ ${#OUTPUTS[@]} -eq 0 ]; then
+    bashio::log.error "ERROR: No connected outputs detected"
     exit 1
 fi
 
-bashio::log.info "X server started successfully (PID: $XORG_PID)"
+OUTPUT_NAME="${OUTPUTS[$((OUTPUT_NUMBER - 1))]}"
+bashio::log.info "Using output: $OUTPUT_NAME"
 
-# ------------------- PYTHON ENV (venv) -------------------
-if [ -d /opt/venv ]; then
-    bashio::log.info "Activating Python venv..."
-    source /opt/venv/bin/activate
-    pip install --upgrade pip
-    pip install CherryPy
+xrandr --output "$OUTPUT_NAME" --primary --auto
+if [ "$ROTATE_DISPLAY" != "normal" ]; then
+    xrandr --output "$OUTPUT_NAME" --rotate "${ROTATE_DISPLAY}"
+fi
+
+# ------------------- KEYBOARD -------------------
+setxkbmap "$KEYBOARD_LAYOUT"
+bashio::log.info "Keyboard layout: $KEYBOARD_LAYOUT"
+
+# ------------------- CURSOR -------------------
+if [ "$CURSOR_TIMEOUT" -gt 0 ]; then
+    unclutter-xfixes --start-hidden --hide-on-touch --fork --timeout "$CURSOR_TIMEOUT" 2>/dev/null || \
+    unclutter --start-hidden --fork --timeout "$CURSOR_TIMEOUT" 2>/dev/null || true
 fi
 
 # ------------------- REST SERVER -------------------
-bashio::log.info "Starting HAOSKiosk REST server..."
-python3 /rest_server.py &
-REST_PID=$!
-bashio::log.info "REST server started with PID: $REST_PID"
-
-# ------------------- FIREFOX KIOSK -------------------
-if [ "$DEBUG_MODE" != true ]; then
-    FIREFOX_PROFILE="/tmp/firefox-kiosk-profile"
-    rm -rf "$FIREFOX_PROFILE" 2>/dev/null
-    mkdir -p "$FIREFOX_PROFILE"
-
-    cat > "$FIREFOX_PROFILE/user.js" << EOF
-// Firefox Kiosk Config
-user_pref("browser.startup.homepage", "${HA_URL}/${HA_DASHBOARD}");
-user_pref("browser.fullscreen.autohide", false);
-EOF
-
-    DISPLAY=:0 firefox --kiosk --new-instance --profile "$FIREFOX_PROFILE" "${HA_URL}/${HA_DASHBOARD}" &
-    FIREFOX_PID=$!
-    bashio::log.info "Firefox launched (PID: $FIREFOX_PID)"
+if [ -f /rest_server.py ]; then
+    bashio::log.info "Starting REST server..."
+    python3 /rest_server.py &
+    REST_PID=$!
+    bashio::log.info "✓ REST server started (PID: $REST_PID)"
 fi
 
-bashio::log.info "HAOSKiosk initialization completed."
-wait
+# ------------------- FIREFOX KIOSK -------------------
+if [ "$DEBUG_MODE" = true ]; then
+    bashio::log.warning "DEBUG MODE: Sleeping indefinitely (no Firefox)"
+    exec sleep infinity
+fi
+
+bashio::log.info "Preparing Firefox kiosk..."
+FIREFOX_PROFILE="/tmp/firefox-kiosk-profile"
+rm -rf "$FIREFOX_PROFILE" 2>/dev/null
+mkdir -p "$FIREFOX_PROFILE"
+
+cat > "$FIREFOX_PROFILE/user.js" << EOF
+user_pref("browser.startup.homepage", "${HA_URL}/${HA_DASHBOARD}");
+user_pref("browser.fullscreen.autohide", false);
+user_pref("browser.tabs.warnOnClose", false);
+user_pref("browser.sessionstore.resume_from_crash", false);
+user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("toolkit.telemetry.enabled", false);
+user_pref("datareporting.policy.dataSubmissionEnabled", false);
+EOF
+
+FULL_URL="${HA_URL}/${HA_DASHBOARD}"
+bashio::log.info "Launching Firefox to: $FULL_URL"
+
+# Attendre un peu pour que X soit vraiment prêt
+sleep 2
+
+# Lancer Firefox
+firefox --kiosk --new-instance --profile "$FIREFOX_PROFILE" "$FULL_URL" > /tmp/firefox.log 2>&1 &
+FIREFOX_PID=$!
+bashio::log.info "Firefox launched (PID: $FIREFOX_PID)"
+
+# Attendre et vérifier
+sleep 5
+if ! kill -0 "$FIREFOX_PID" 2>/dev/null; then
+    bashio::log.error "ERROR: Firefox died! Logs:"
+    tail -30 /tmp/firefox.log 2>/dev/null | sed 's/^/  /'
+    exit 1
+fi
+
+# Auto-login avec xdotool
+if command -v xdotool >/dev/null 2>&1; then
+    bashio::log.info "Waiting ${LOGIN_DELAY}s before auto-login..."
+    sleep "$LOGIN_DELAY"
+    
+    (
+        sleep 3
+        WINDOW_ID=$(xdotool search --name "Firefox" 2>/dev/null | head -1)
+        if [ -n "$WINDOW_ID" ]; then
+            bashio::log.info "Auto-login: typing credentials..."
+            xdotool windowactivate --sync "$WINDOW_ID"
+            sleep 1
+            xdotool type --delay 100 "$HA_USERNAME"
+            xdotool key Tab
+            sleep 0.5
+            xdotool type --delay 100 "$HA_PASSWORD"
+            sleep 0.5
+            xdotool key Return
+            bashio::log.info "✓ Auto-login completed"
+        else
+            bashio::log.warning "Firefox window not found for auto-login"
+        fi
+    ) &
+fi
+
+bashio::log.info "✓ HAOSKiosk initialization completed"
+bashio::log.info "Firefox PID: $FIREFOX_PID | Xorg PID: $XORG_PID"
+
+# Monitoring
+while kill -0 "$FIREFOX_PID" 2>/dev/null; do
+    sleep 30
+done
+
+bashio::log.error "Firefox process terminated unexpectedly!"
+exit 1
