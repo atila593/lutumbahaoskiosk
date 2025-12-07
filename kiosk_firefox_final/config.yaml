@@ -84,7 +84,7 @@ schema:
   map_touch_inputs: bool
   keyboard_layout: str
   onscreen_keyboard: bool
-  save_onboard_config: bool
+  save_onscreen_config: bool
   xorg_conf: str
   xorg_append_replace: list(append|replace)
   rest_port: port
