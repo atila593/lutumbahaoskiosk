@@ -1,23 +1,26 @@
-
-  Section "ServerFlags"
+Section "ServerFlags"
       Option "AutoAddDevices" "true"
       Option "AutoEnableDevices" "true"
       Option "AllowMouseOpenFail" "true"
       Option "DontVTSwitch" "true"
   EndSection
 
-  Section "Device"
-      Identifier "Card0"
-      Driver "modesetting"
-      Option "AccelMethod" "glamor"
-  EndSection
+Section "Module"
+    Disable "intel"
+EndSection
 
-  Section "Screen"
-      Identifier "Screen0"
-      Device "Card0"
-  EndSection
+Section "Device"
+    Identifier "Card0"
+    Driver "modesetting"
+    Option "AccelMethod" "glamor"
+EndSection
 
-  Section "Monitor"
-      Identifier "Monitor0"
-  EndSection
+Section "Screen"
+    Identifier "Screen0"
+    Device "Card0"
+EndSection
+
+Section "Monitor"
+    Identifier "Monitor0"
+EndSection
 
