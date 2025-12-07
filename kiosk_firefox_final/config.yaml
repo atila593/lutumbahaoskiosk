@@ -1,5 +1,5 @@
 name: "Firefox HAOS Kiosk"
-version: "1.0.13"
+version: "1.0.9"
 slug: "kiosk_firefox_final"
 description: "Firefox en mode Kiosk pour Home Assistant OS, avec auto-login et REST API."
 url: "https://github.com/atila593/lutumbahaoskiosk"
@@ -23,11 +23,6 @@ host_dbus: true
 apparmor: false
 full_access: true
 
-cap_add:
-  - SYS_RAWIO
-  - SYS_ADMIN
-
-# CORRECTION: devices au nouveau format (liste simple)
 devices:
   - /dev/dri
   - /dev/fb0
@@ -37,7 +32,6 @@ devices:
   - /dev/tty2
   - /dev/tty7
   - /dev/console
-
 
 udev: true
 
@@ -68,7 +62,28 @@ options:
   keyboard_layout: "fr"
   onscreen_keyboard: false
   save_onscreen_config: true
-  xorg_conf: ""
+  xorg_conf: |
+    Section "ServerFlags"
+        Option "AutoAddDevices" "true"
+        Option "AutoEnableDevices" "true"
+        Option "AllowMouseOpenFail" "true"
+        Option "DontVTSwitch" "true"
+    EndSection
+
+    Section "Device"
+        Identifier "Card0"
+        Driver "modesetting"
+        Option "AccelMethod" "glamor"
+    EndSection
+
+    Section "Screen"
+        Identifier "Screen0"
+        Device "Card0"
+    EndSection
+
+    Section "Monitor"
+        Identifier "Monitor0"
+    EndSection
   xorg_append_replace: "append"
   rest_port: 8080
   rest_authorization_token: ""
@@ -103,3 +118,4 @@ schema:
 init: false
 watchdog: "tcp://[HOST]:8080"
 tmpfs: true
+
