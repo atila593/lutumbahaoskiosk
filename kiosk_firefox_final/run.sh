@@ -201,7 +201,7 @@ NOCURSOR=""
 [ "$CURSOR_TIMEOUT" -lt 0 ] && NOCURSOR="-nocursor"
 
 # Lancer Xorg en arrière-plan
-Xorg $NOCURSOR > /var/log/Xorg-startup.log 2>&1 &
+Xorg $NOCURSOR -novtswitch > /var/log/Xorg-startup.log 2>&1 &
 XORG_PID=$!
 bashio::log.info "Xorg launched with PID: $XORG_PID"
 
