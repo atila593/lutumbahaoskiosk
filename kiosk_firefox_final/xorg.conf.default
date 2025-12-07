@@ -16,9 +16,8 @@ EndSection
 
 Section "Device"
     Identifier "Card0"
-    Driver "intel"
-    Option "AccelMethod" "sna"
-    Option "TearFree" "true"
+    Driver "modesetting"
+    Option "AccelMethod" "glamor"
 EndSection
 
 Section "Screen"
