@@ -1,8 +1,8 @@
 name: "Kiosk Firefox HAOS"
 description: |
   Start X server and Firefox browser in kiosk mode on HAOS
-version: "1.0.0"
-slug: "bb1438d6_kiosk_firefox_final"
+version: "1.0.1"
+slug: "kiosk_firefox_final"
 
 arch:
   - amd64
