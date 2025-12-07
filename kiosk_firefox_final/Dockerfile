@@ -1,7 +1,19 @@
+# -----------------------------
+# Base image
+# -----------------------------
 ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
 FROM ${BUILD_FROM}
 
-# Installer Xorg, drivers Intel et Firefox
+# -----------------------------
+# Arguments et variables
+# -----------------------------
+ENV VENV_PATH=/opt/venv
+ENV PATH="${VENV_PATH}/bin:$PATH"
+ENV DISPLAY=:0
+
+# -----------------------------
+# Installer les dépendances système
+# -----------------------------
 RUN apk update && apk add --no-cache \
     xorg-server \
     xf86-video-intel \
@@ -24,20 +36,37 @@ RUN apk update && apk add --no-cache \
     jq \
     dbus \
     libinput \
-    eudev && \
-    rm -rf /var/cache/apk/*
+    eudev \
+    && rm -rf /var/cache/apk/*
 
-# Environnement Python
-RUN python3 -m venv /opt/venv
-RUN pip install --upgrade pip && pip install CherryPy
+# -----------------------------
+# Créer un virtualenv pour Python
+# -----------------------------
+RUN python3 -m venv $VENV_PATH \
+    && $VENV_PATH/bin/pip install --upgrade pip \
+    && $VENV_PATH/bin/pip install CherryPy
 
-# Copier scripts
+# -----------------------------
+# Copier les scripts
+# -----------------------------
 COPY run.sh /run.sh
-COPY toggle_keyboard.py /toggle_keyboard.py
 COPY rest_server.py /rest_server.py
+COPY toggle_keyboard.py /toggle_keyboard.py
 
-# Permissions d'exécution
+# -----------------------------
+# Copier la config Xorg si besoin
+# -----------------------------
+# COPY xorg.conf.default /etc/X11/xorg.conf.default
+# Tu peux remplacer par ta propre config si nécessaire
+
+# -----------------------------
+# Permissions
+# -----------------------------
 RUN chmod +x /run.sh
 
-CMD [ "/run.sh" ]
+# -----------------------------
+# Commande par défaut
+# -----------------------------
+CMD ["/run.sh"]
+
 
