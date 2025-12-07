@@ -30,10 +30,14 @@ cap_add:
 # CORRECTION: devices au nouveau format (liste simple)
 devices:
   - /dev/dri
+  - /dev/fb0
+  - /dev/input
   - /dev/tty0
   - /dev/tty1
-  - /dev/fb0
+  - /dev/tty2
+  - /dev/tty7
   - /dev/console
+
 
 udev: true
 
