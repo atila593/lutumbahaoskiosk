@@ -1,9 +1,8 @@
 Section "ServerFlags"
-      Option "AutoAddDevices" "true"
-      Option "AutoEnableDevices" "true"
-      Option "AllowMouseOpenFail" "true"
-      Option "DontVTSwitch" "true"
-  EndSection
+    Option "AutoAddDevices" "true"
+    Option "AutoEnableDevices" "true"
+    Option "AllowMouseOpenFail" "true"
+EndSection
 
 Section "Module"
     Disable "intel"
@@ -13,6 +12,8 @@ Section "Device"
     Identifier "Card0"
     Driver "modesetting"
     Option "AccelMethod" "glamor"
+    Option "UseEvents" "false"       # désactive la lecture directe du TTY
+    Option "DRI" "3"
 EndSection
 
 Section "Screen"
