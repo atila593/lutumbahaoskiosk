@@ -1,51 +1,23 @@
-Section "ServerFlags"
-    Option "AutoAddDevices" "true"
-    Option "AutoEnableDevices" "true"
-    Option "AllowMouseOpenFail" "true"
-    Option "DontVTSwitch" "true"
-    Option "AutoAddGPU" "false"
-EndSection
 
-Section "ServerLayout"
-    Identifier "ServerLayout0"
-EndSection
+  Section "ServerFlags"
+      Option "AutoAddDevices" "true"
+      Option "AutoEnableDevices" "true"
+      Option "AllowMouseOpenFail" "true"
+      Option "DontVTSwitch" "true"
+  EndSection
 
-Section "Monitor"
-    Identifier "Monitor0"
-EndSection
+  Section "Device"
+      Identifier "Card0"
+      Driver "modesetting"
+      Option "AccelMethod" "glamor"
+  EndSection
 
-Section "Device"
-    Identifier "Card0"
-    Driver "modesetting"
-    Option "AccelMethod" "glamor"
-EndSection
+  Section "Screen"
+      Identifier "Screen0"
+      Device "Card0"
+  EndSection
 
-Section "Screen"
-    Identifier "Screen0"
-    Device "Card0"
-    Monitor "Monitor0"
-EndSection
+  Section "Monitor"
+      Identifier "Monitor0"
+  EndSection
 
-Section "InputClass"
-    Identifier "libinput keyboard catchall"
-    MatchIsKeyboard "on"
-    Driver "libinput"
-EndSection
-
-Section "InputClass"
-    Identifier "libinput pointer catchall"
-    MatchIsPointer "on"
-    Driver "libinput"
-EndSection
-
-Section "InputClass"
-    Identifier "libinput touchpad catchall"
-    MatchIsTouchpad "on"
-    Driver "libinput"
-EndSection
-
-Section "InputClass"
-    Identifier "libinput touchscreen catchall"
-    MatchIsTouchscreen "on"
-    Driver "libinput"
-EndSection
