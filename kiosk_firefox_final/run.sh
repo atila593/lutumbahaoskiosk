@@ -201,7 +201,7 @@ NOCURSOR=""
 [ "$CURSOR_TIMEOUT" -lt 0 ] && NOCURSOR="-nocursor"
 
 # CORRECTION CRITIQUE : Capturer le PID de Xorg
-Xorg $NOCURSOR vt7 &
+Xorg $NOCURSOR &
 XORG_PID=$!
 bashio::log.info "Xorg process started, checking if it stays alive..."
 sleep 2
