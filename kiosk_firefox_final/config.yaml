@@ -22,7 +22,6 @@ host_network: true
 host_dbus: true
 apparmor: false
 full_access: true
-privileged: true
 
 cap_add:
   - SYS_RAWIO
