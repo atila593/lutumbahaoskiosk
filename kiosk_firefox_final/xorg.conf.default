@@ -2,6 +2,12 @@ Section "ServerFlags"
     Option "AutoAddDevices" "true"
     Option "AutoEnableDevices" "true"
     Option "AllowMouseOpenFail" "true"
+    Option "DontVTSwitch" "true"
+    Option "AutoAddGPU" "false"
+EndSection
+
+Section "ServerLayout"
+    Identifier "ServerLayout0"
 EndSection
 
 Section "Monitor"
@@ -11,6 +17,8 @@ EndSection
 Section "Device"
     Identifier "Card0"
     Driver "intel"
+    Option "AccelMethod" "sna"
+    Option "TearFree" "true"
 EndSection
 
 Section "Screen"
