@@ -1,19 +1,17 @@
-# -----------------------------
+##############################
+# Dockerfile pour HAOS Kiosk
+##############################
+
 # Base image
-# -----------------------------
 ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
 FROM ${BUILD_FROM}
 
-# -----------------------------
-# Arguments et variables
-# -----------------------------
-ENV VENV_PATH=/opt/venv
-ENV PATH="${VENV_PATH}/bin:$PATH"
+# Variables d'environnement
+ENV LANG=C.UTF-8
 ENV DISPLAY=:0
+ENV VENV_PATH=/opt/venv
 
-# -----------------------------
-# Installer les dépendances système
-# -----------------------------
+# Installer paquets nécessaires
 RUN apk update && apk add --no-cache \
     xorg-server \
     xf86-video-intel \
@@ -39,34 +37,20 @@ RUN apk update && apk add --no-cache \
     eudev \
     && rm -rf /var/cache/apk/*
 
-# -----------------------------
-# Créer un virtualenv pour Python
-# -----------------------------
+# Créer et utiliser le virtualenv pour CherryPy
 RUN python3 -m venv $VENV_PATH \
     && $VENV_PATH/bin/pip install --upgrade pip \
     && $VENV_PATH/bin/pip install CherryPy
 
-# -----------------------------
-# Copier les scripts
-# -----------------------------
+# Copier scripts et fichiers de config
 COPY run.sh /run.sh
 COPY rest_server.py /rest_server.py
 COPY toggle_keyboard.py /toggle_keyboard.py
-
-# -----------------------------
-# Copier la config Xorg si besoin
-# -----------------------------
+# Si tu as un xorg.conf spécifique
 # COPY xorg.conf.default /etc/X11/xorg.conf.default
-# Tu peux remplacer par ta propre config si nécessaire
 
-# -----------------------------
-# Permissions
-# -----------------------------
+# Donner les permissions d'exécution
 RUN chmod +x /run.sh
 
-# -----------------------------
 # Commande par défaut
-# -----------------------------
-CMD ["/run.sh"]
-
-
+CMD [ "/run.sh" ]
