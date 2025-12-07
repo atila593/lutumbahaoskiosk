@@ -1,7 +1,7 @@
 name: "Kiosk Firefox HAOS"
 description: |
   Start X server and Firefox browser in kiosk mode on HAOS
-version: "1.0.3"
+version: "1.0.4"
 slug: "kiosk_firefox_final"
 
 arch:
