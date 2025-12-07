@@ -15,6 +15,9 @@ RUN \
         apt-get install -y --no-install-recommends \
             xserver-xorg \
             xserver-xorg-legacy \
+            xserver-xorg-video-intel \
+            xserver-xorg-video-fbdev \
+            xserver-xorg-video-vesa \
             x11-xserver-utils \
             xdotool \
             xclip \
@@ -43,6 +46,9 @@ RUN \
         apk update && \
         apk add --no-cache \
             xorg-server \
+            xf86-video-intel \
+            xf86-video-fbdev \
+            xf86-video-vesa \
             xrandr \
             xdotool \
             xclip \
