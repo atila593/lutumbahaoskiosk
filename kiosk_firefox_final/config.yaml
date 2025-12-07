@@ -1,5 +1,5 @@
 name: "Firefox HAOS Kiosk"
-version: "1.0.8"
+version: "1.0.9"
 slug: "kiosk_firefox_final"
 description: "Firefox en mode Kiosk pour Home Assistant OS, avec auto-login et REST API."
 url: "https://github.com/atila593/lutumbahaoskiosk"
@@ -22,6 +22,11 @@ host_network: true
 host_dbus: true
 apparmor: false
 full_access: true
+privileged: true
+
+cap_add:
+  - SYS_RAWIO
+  - SYS_ADMIN
 
 # CORRECTION: devices au nouveau format (liste simple)
 devices:
