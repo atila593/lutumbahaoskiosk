@@ -38,9 +38,6 @@ devices:
 # Accès udev pour la détection des périphériques
 udev: true
 
-# Capacités kernel nécessaires pour X11
-kernel_modules: true
-
 # Exposition du port REST API
 ports:
   8080/tcp: 8080
